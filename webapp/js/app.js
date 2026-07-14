@@ -93,7 +93,6 @@
         const followThroughProgress = Math.min(1, postImpactElapsed / FOLLOW_THROUGH_DURATION_MS);
         const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
         FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame);
-        FocusRender.drawFaceLine(ctx, canvas.width, canvas.height, currentClubheadState.faceToTarget);
 
         const rawProgress = Math.min(1, postImpactElapsed / FLIGHT_DURATION_MS);
         const progress = FocusAnim.easeOutCubic(rawProgress);

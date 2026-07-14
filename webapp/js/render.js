@@ -102,32 +102,6 @@
     ctx.restore();
   }
 
-  /**
-   * Where the clubface was actually aimed at impact: a dashed line through
-   * the impact point at faceAngleDeg, extended both toward the target and
-   * back through the clubhead, so you can see face-to-target versus the
-   * fixed target line at a glance. Computed directly in canvas-pixel space
-   * (not normalized shot-space) so it stays perfectly straight through the
-   * approach/flight zones, which use different pixel-per-unit scales.
-   */
-  function drawFaceLine(ctx, width, height, faceAngleDeg, options) {
-    const pos = shotPointToCanvas({ x: 0, y: 0 }, width, height, options);
-    const angleRad = (faceAngleDeg * Math.PI) / 180;
-    const dirX = Math.sin(angleRad);
-    const dirY = -Math.cos(angleRad);
-    const extend = Math.max(width, height) * 1.5;
-
-    ctx.save();
-    ctx.strokeStyle = COLORS.faceLine;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([10, 8]);
-    ctx.beginPath();
-    ctx.moveTo(pos.x - dirX * extend, pos.y - dirY * extend);
-    ctx.lineTo(pos.x + dirX * extend, pos.y + dirY * extend);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   function drawShotPath(ctx, width, height, pathPoints, progress, options) {
     const revealCount = Math.max(1, Math.round(pathPoints.length * progress));
     const visible = pathPoints.slice(0, revealCount);
@@ -169,6 +143,21 @@
   }
 
   /**
+   * Map a mat-space point (millimeters, +y = downrange/target direction -
+   * see vision/mat_tracker.py) to canvas pixels. Flips y so mat +y maps to
+   * decreasing canvas y ("up the screen"), matching shotPointToCanvas's
+   * convention that the target direction is up - without this, the
+   * tracked stance line and the shot/target lines would disagree about
+   * which way "toward the target" even points on screen.
+   */
+  function matPointToCanvas(pt, width, height, matSize) {
+    return {
+      x: (pt.x / matSize.widthMm) * width,
+      y: height - (pt.y / matSize.heightMm) * height,
+    };
+  }
+
+  /**
    * Draw the real, camera-tracked stance/alignment line. `footMatPoints`
    * is a pair of {x, y} points in mat-space millimeters; `matSize` is
    * {widthMm, heightMm}. Drawn as a full-width line through the two feet,
@@ -178,13 +167,8 @@
     if (!footMatPoints) return;
     const [left, right] = footMatPoints;
 
-    const toCanvas = (pt) => ({
-      x: (pt.x / matSize.widthMm) * width,
-      y: (pt.y / matSize.heightMm) * height,
-    });
-
-    const p1 = toCanvas(left);
-    const p2 = toCanvas(right);
+    const p1 = matPointToCanvas(left, width, height, matSize);
+    const p2 = matPointToCanvas(right, width, height, matSize);
 
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
@@ -213,13 +197,8 @@
     const opts = Object.assign({ footLengthPx: 46, footWidthPx: 22 }, options || {});
     const [left, right] = footMatPoints;
 
-    const toCanvas = (pt) => ({
-      x: (pt.x / matSize.widthMm) * width,
-      y: (pt.y / matSize.heightMm) * height,
-    });
-
-    const p1 = toCanvas(left);
-    const p2 = toCanvas(right);
+    const p1 = matPointToCanvas(left, width, height, matSize);
+    const p2 = matPointToCanvas(right, width, height, matSize);
     // Note: under ctx.rotate(theta), local "+y" (the foot's toe direction
     // in the path below) already ends up perpendicular to a rotate-by-theta
     // reference direction - so using the stance line's own angle here
@@ -303,6 +282,24 @@
     ctx.lineTo(-fw * 1.2, -fw * 0.53); // hosel, angled up and back from the heel
     ctx.stroke();
 
+    // Face-line: a dashed "laser sight" extension of the face edge itself,
+    // past the toe and heel - not an aim/error indicator, just the face's
+    // own line drawn long. Lives in the same rotated/translated local
+    // space as the club, so it moves and rotates with it continuously
+    // through the approach, impact, and follow-through.
+    const faceExtend = fw * 3;
+    ctx.save();
+    ctx.strokeStyle = COLORS.faceLine;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.moveTo(-fw - faceExtend, 0);
+    ctx.lineTo(-fw, 0);
+    ctx.moveTo(fw, 0);
+    ctx.lineTo(fw + faceExtend, 0);
+    ctx.stroke();
+    ctx.restore();
+
     if (frame.showImpactMarker) {
       const markerX = clubheadState.horizontalImpactNorm * fw;
       ctx.fillStyle = COLORS.shotHead;
@@ -363,9 +360,9 @@
     COLORS,
     clearCanvas,
     shotPointToCanvas,
+    matPointToCanvas,
     drawDistanceGuides,
     drawTargetLine,
-    drawFaceLine,
     drawShotPath,
     drawAlignmentLine,
     drawFootOutlines,

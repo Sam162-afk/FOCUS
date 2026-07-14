@@ -118,6 +118,32 @@ test("drawAlignmentLine extends a line through both feet to the canvas edges", (
   assert.ok(Math.abs(moveTo[2] - lineTo[2]) < 1e-6, "expected a level line for a level stance");
 });
 
+test("matPointToCanvas maps mat +y (target direction) to decreasing canvas y (up the screen)", () => {
+  // Regression test: mat-space and shot-space used to disagree about
+  // which way "toward the target" points on screen (mat-space mapped +y
+  // to increasing/downward canvas y, shot-space treats +y as up). Without
+  // this, the tracked stance line and the target/shot lines could never
+  // be meaningfully compared.
+  const matSize = { widthMm: 1000, heightMm: 1500 };
+  const near = FocusRender.matPointToCanvas({ x: 0, y: 0 }, 800, 600, matSize);
+  const far = FocusRender.matPointToCanvas({ x: 0, y: 1500 }, 800, 600, matSize);
+  assert.ok(far.y < near.y, "expected larger mat y (further downrange) to map to a smaller (higher up) canvas y");
+});
+
+test("a square stance (feet parallel to the mat y-axis) draws a vertical line, matching the target line's orientation", () => {
+  const ctx = makeMockCtx();
+  const matSize = { widthMm: 1000, heightMm: 1500 };
+  // Same mat x, different mat y - parallel to the target/mat-y-axis, per
+  // the corrected "square stance" convention (see vision/mat_tracker.py).
+  const feet = [{ x: 500, y: 400 }, { x: 500, y: 1100 }];
+
+  FocusRender.drawAlignmentLine(ctx, 800, 600, feet, matSize);
+
+  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
+  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
+  assert.ok(Math.abs(moveTo[1] - lineTo[1]) < 1e-6, "expected a vertical line (same x) for a square stance");
+});
+
 test("drawAlignmentLine does nothing when no feet are detected", () => {
   const ctx = makeMockCtx();
   FocusRender.drawAlignmentLine(ctx, 800, 600, null, { widthMm: 1000, heightMm: 1500 });
@@ -160,24 +186,6 @@ test("drawTargetLine draws a single vertical reference line from the impact poin
   assert.equal(lineTo[2], 0);
 });
 
-test("drawFaceLine draws a straight dashed line through the impact point at the given angle", () => {
-  const ctx = makeMockCtx();
-  FocusRender.drawFaceLine(ctx, 800, 600, 0);
-  assert.ok(ctx.calls.some((c) => c[0] === "setLineDash"));
-  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
-  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
-  // A square (0deg) face line is vertical, same as the target line.
-  assert.ok(Math.abs(moveTo[1] - lineTo[1]) < 1e-9);
-});
-
-test("drawFaceLine tilts sideways for a nonzero face angle", () => {
-  const ctx = makeMockCtx();
-  FocusRender.drawFaceLine(ctx, 800, 600, 20);
-  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
-  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
-  assert.notEqual(moveTo[1], lineTo[1]);
-});
-
 test("drawClubhead strokes a wireframe outline (no fill) at every frame", () => {
   const ctx = makeMockCtx();
   const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };
@@ -191,6 +199,22 @@ test("drawClubhead strokes a wireframe outline (no fill) at every frame", () => 
   assert.ok(ctx.calls.some((c) => c[0] === "rotate"));
   // Not at impact yet - no marker dot (fill/arc) should be drawn.
   assert.ok(!ctx.calls.some((c) => c[0] === "arc"));
+});
+
+test("drawClubhead draws a dashed face-line extension attached to the club, at every frame", () => {
+  // Regression test: the face line used to be a separate fixed-angle line
+  // anchored at the impact point, only drawn post-impact - disconnected
+  // from the club once it moved into follow-through. It should now be
+  // part of the club's own local (rotated/translated) drawing, present
+  // during approach, impact, and follow-through alike.
+  const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };
+  const state = FocusClubhead.computeClubheadState(shot);
+
+  for (const frame of [FocusClubhead.sampleClubheadFrame(state, 0.5), FocusClubhead.sampleFollowThroughFrame(state, 0.5)]) {
+    const ctx = makeMockCtx();
+    FocusRender.drawClubhead(ctx, 800, 600, state, frame);
+    assert.ok(ctx.calls.some((c) => c[0] === "setLineDash"), "expected a dashed face-line extension");
+  }
 });
 
 test("drawClubhead draws the impact marker only once atImpact is true", () => {

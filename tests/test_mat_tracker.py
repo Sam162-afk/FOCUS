@@ -49,15 +49,19 @@ def make_frame(foot_pixel_centers=None):
 
 
 def test_square_stance_gives_near_zero_alignment():
-    # Feet side-by-side at the same "downrange" pixel row -> mat-space
-    # stance line should be parallel to mat x-axis -> alignment ~ 0 deg.
+    # A golfer stands side-on to the target, so a square stance line runs
+    # PARALLEL to the target line (mat y-axis), like railroad tracks - not
+    # perpendicular to it. Same pixel/mat x, different y -> alignment ~ 0.
     foot_detector = FootDetector(min_area=200, max_area=5000, history=20, settle_frames=3, background_learn_frames=10)
     tracker = MatTracker(mat_width_mm=MAT_WIDTH_MM, mat_height_mm=MAT_HEIGHT_MM, foot_detector=foot_detector)
 
     for _ in range(10):
         tracker.process_frame(make_frame())
 
-    left_px, right_px = (400, 400), (500, 400)
+    # Slightly different x (449 vs 451) so the detector's left-to-right
+    # sort is deterministic - exactly-equal x makes the sort order (and
+    # thus which foot ends up "left" vs "right") unstable.
+    left_px, right_px = (449, 340), (451, 460)
     state = None
     for _ in range(6):
         state = tracker.process_frame(make_frame([left_px, right_px]))
@@ -69,15 +73,15 @@ def test_square_stance_gives_near_zero_alignment():
 
 
 def test_open_stance_gives_nonzero_alignment():
-    # Right foot pulled "downrange" relative to left -> stance line is no
-    # longer parallel to the x-axis -> nonzero alignment angle.
+    # Right foot pulled sideways (mat x) relative to left -> stance line is
+    # no longer parallel to the mat y-axis/target line -> nonzero alignment.
     foot_detector = FootDetector(min_area=200, max_area=5000, history=20, settle_frames=3, background_learn_frames=10)
     tracker = MatTracker(mat_width_mm=MAT_WIDTH_MM, mat_height_mm=MAT_HEIGHT_MM, foot_detector=foot_detector)
 
     for _ in range(10):
         tracker.process_frame(make_frame())
 
-    left_px, right_px = (400, 400), (500, 460)
+    left_px, right_px = (450, 380), (510, 420)
     state = None
     for _ in range(6):
         state = tracker.process_frame(make_frame([left_px, right_px]))

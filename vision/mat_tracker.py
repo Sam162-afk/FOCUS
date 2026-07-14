@@ -5,12 +5,13 @@ single mat-state: is the mat calibrated, where are the feet in mat-space
 
 Target line convention: mat-space +y is "downrange" (from the back
 markers, id0/id1, towards the front markers, id3/id2 - see
-aruco_tracker.py's docstring for the marker layout). A square stance has
-its stance line (left foot -> right foot) parallel to the mat-space
-x-axis, i.e. perpendicular to the target line. alignment_deg is the
-signed angle between the stance line and that perpendicular: 0 = square,
-positive = aimed right of target, negative = aimed left (open/closed
-depends on handedness, left as a display-layer concern).
+aruco_tracker.py's docstring for the marker layout). A golfer stands
+side-on to the target, so a square stance has its stance line (left foot
+-> right foot) parallel to the target line (mat-space y-axis) - like the
+two rails of a railroad track, not crossing it. alignment_deg is the
+signed angle between the stance line and the mat y-axis: 0 = square,
+nonzero = open/closed (exact sign-to-open/closed mapping depends on
+handedness, left as a display-layer concern).
 
 Runs as a CLI against a live camera or a video file, and continuously
 writes the latest mat state as JSON to a file so the bridge process (see
@@ -66,9 +67,9 @@ class MatTracker:
 
             dx = right_mat[0] - left_mat[0]
             dy = right_mat[1] - left_mat[1]
-            # atan2(dy, dx) is 0 when the stance line is parallel to the
-            # mat x-axis (square to target); nonzero = open/closed stance.
-            alignment_deg = math.degrees(math.atan2(dy, dx))
+            # atan2(dx, dy) is 0 when the stance line is parallel to the
+            # mat y-axis / target line (square stance); nonzero = open/closed.
+            alignment_deg = math.degrees(math.atan2(dx, dy))
 
         return MatState(
             calibrated=aruco_result.calibrated,
