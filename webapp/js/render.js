@@ -24,7 +24,6 @@
     gridLabel: "rgba(154, 157, 143, 0.65)",
     targetLine: "rgba(245, 242, 234, 0.32)", // neutral dashed reference, distinct from the tracked stance line
     faceLine: "rgba(255, 176, 32, 0.55)", // dashed amber - ties to the impact-derived data family
-    boxBorder: "rgba(245, 242, 234, 0.3)",
   };
 
   function clearCanvas(ctx, width, height) {
@@ -365,52 +364,59 @@
     }
   }
 
+  // Where each stat lands relative to the ball origin, and at what angle -
+  // matching a real projected display, where the numbers lie directly on
+  // the turf around the ball at varying angles, not stacked in a uniform
+  // list. Cycles if there are more stats than slots.
+  const STAT_LAYOUT = [
+    { dx: 60, dy: -190, rotationDeg: -13 },
+    { dx: 190, dy: -250, rotationDeg: -9 },
+    { dx: 150, dy: -60, rotationDeg: 5 },
+  ];
+
   /**
-   * Stat overlay: each stat in its own bordered box (thin outline, label
-   * top, big tabular-numeral value below), rather than free-floating text.
-   * `stats` is the array of "Label: value" strings from stat-catalog.js's
-   * buildStatLines(). When `options.origin` (a canvas-pixel point) is
-   * given, the stack anchors just off to the side of that point - the
-   * golfer's actual ball position - the way a real display's numbers sit
-   * next to the ball rather than pinned to a screen corner regardless of
-   * where the golfer is standing. Falls back to a fixed top-left position
-   * when no origin is tracked yet.
+   * Stat overlay: plain glowing text (no boxes/borders) scattered around
+   * the ball position at varying rotation angles, the way a real floor
+   * projector's numbers read as if lying flat on the turf next to the
+   * ball rather than a list pinned to a screen corner. `stats` is the
+   * array of "Label: value" strings from stat-catalog.js's
+   * buildStatLines(). Falls back to a plain vertical list at a fixed
+   * position (no rotation) when no `options.origin` (ball canvas point)
+   * is tracked yet.
    */
   function drawStatsOverlay(ctx, width, stats, options) {
-    const opts = Object.assign(
-      { boxWidth: 210, boxHeight: 64, gap: 10, startX: 24, startY: 24, origin: null, originGapX: 40, originGapY: 20 },
-      options || {}
-    );
-    const totalHeight = stats.length * opts.boxHeight + Math.max(0, stats.length - 1) * opts.gap;
-    const startX = opts.origin ? opts.origin.x + opts.originGapX : opts.startX;
-    // Stack ends just above the ball position (boxes read upward toward
-    // the flight path) rather than starting at the ball and running off
-    // the bottom of the screen.
-    const startY = opts.origin ? opts.origin.y - opts.originGapY - totalHeight : opts.startY;
-    let y = startY;
+    const opts = Object.assign({ origin: null, startX: 24, startY: 24, lineHeight: 70, layout: STAT_LAYOUT }, options || {});
 
-    stats.forEach((line) => {
+    stats.forEach((line, i) => {
       const separatorIndex = line.indexOf(": ");
       const label = separatorIndex === -1 ? line : line.slice(0, separatorIndex);
       const value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 2);
 
-      ctx.strokeStyle = COLORS.boxBorder;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(startX, y, opts.boxWidth, opts.boxHeight);
+      const slot = opts.layout[i % opts.layout.length];
+      const x = opts.origin ? opts.origin.x + slot.dx : opts.startX;
+      const y = opts.origin ? opts.origin.y + slot.dy : opts.startY + i * opts.lineHeight;
+      const rotationRad = opts.origin ? (slot.rotationDeg * Math.PI) / 180 : 0;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotationRad);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+
+      ctx.shadowColor = COLORS.text;
+      ctx.shadowBlur = 6;
 
       ctx.fillStyle = COLORS.textDim;
-      ctx.font = "600 12px ui-sans-serif, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.letterSpacing = "2px";
-      ctx.fillText(label.toUpperCase(), startX + 14, y + 10);
+      ctx.font = "700 13px ui-sans-serif, sans-serif";
+      ctx.letterSpacing = "1.5px";
+      ctx.fillText(label.toUpperCase(), 0, 0);
       ctx.letterSpacing = "0px";
 
       ctx.fillStyle = COLORS.text;
-      ctx.font = "700 28px ui-monospace, 'SF Mono', Consolas, monospace";
-      ctx.fillText(value, startX + 14, y + 28);
+      ctx.font = "800 34px ui-sans-serif, sans-serif";
+      ctx.fillText(value, 0, 34);
 
-      y += opts.boxHeight + opts.gap;
+      ctx.restore();
     });
   }
 

@@ -163,16 +163,33 @@ test("drawStatsOverlay writes a label and a value fillText call per stat line", 
   assert.ok(texts.includes("1.48"));
 });
 
-test("drawStatsOverlay draws one bordered box per stat", () => {
+test("drawStatsOverlay draws plain glowing text with no bordered boxes", () => {
+  // Regression test: the reference display projects numbers directly onto
+  // the turf (plain text, no boxes) - matches a real commercial floor
+  // projection setup, not a corner-pinned HUD list.
   const ctx = makeMockCtx();
   FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Smash Factor: 1.48", "Carry: 220 yds"]);
-  const boxCalls = ctx.calls.filter((c) => c[0] === "strokeRect");
-  assert.equal(boxCalls.length, 3);
+  assert.equal(ctx.calls.filter((c) => c[0] === "strokeRect").length, 0);
+});
 
-  // Boxes stack vertically without overlapping.
-  const tops = boxCalls.map((c) => c[2]);
-  assert.ok(tops[1] > tops[0]);
-  assert.ok(tops[2] > tops[1]);
+test("drawStatsOverlay rotates and scatters each stat around a given origin, not a uniform stack", () => {
+  const ctx = makeMockCtx();
+  const origin = { x: 500, y: 400 };
+  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Carry: 220 yds", "Ball Speed: 148 mph"], { origin });
+
+  const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate");
+  assert.equal(rotateCalls.length, 3);
+  // Not all the same angle / not zero - each stat sits at its own slot.
+  const angles = rotateCalls.map((c) => c[1]);
+  assert.ok(new Set(angles).size > 1, "expected varying rotation angles across stats");
+
+  const translateCalls = ctx.calls.filter((c) => c[0] === "translate");
+  assert.equal(translateCalls.length, 3);
+  translateCalls.forEach(([, x, y]) => {
+    // Each stat lands reasonably close to the ball origin, not stacked far
+    // away in a column.
+    assert.ok(Math.hypot(x - origin.x, y - origin.y) < 400, `expected stat near origin, got (${x}, ${y})`);
+  });
 });
 
 test("drawTargetLine draws a single vertical reference line from the impact point", () => {
@@ -323,25 +340,15 @@ test("shotPointToCanvas falls back to the default origin when no originPx is giv
   assert.equal(pt.y, height - 260);
 });
 
-test("drawStatsOverlay anchors the stack beside a given origin instead of the fixed corner", () => {
+test("drawStatsOverlay falls back to a plain unrotated vertical list when no origin is given", () => {
   const ctx = makeMockCtx();
-  const origin = { x: 500, y: 400 };
-  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Carry: 220 yds"], { origin });
-
-  const boxCalls = ctx.calls.filter((c) => c[0] === "strokeRect");
-  assert.equal(boxCalls.length, 2);
-  // Anchored to the right of the origin's x, not the fixed startX=24 corner.
-  assert.ok(boxCalls[0][1] > origin.x, `expected box x > origin.x (${origin.x}), got ${boxCalls[0][1]}`);
-  // The stack ends just above the origin's y (boxes read upward toward the
-  // flight path), not below the fixed startY=24 corner.
-  const lastBoxBottom = boxCalls[1][2] + boxCalls[1][4];
-  assert.ok(lastBoxBottom <= origin.y, `expected the stack to end at/above origin.y (${origin.y}), got bottom=${lastBoxBottom}`);
-});
-
-test("drawStatsOverlay falls back to the fixed top-left corner when no origin is given", () => {
-  const ctx = makeMockCtx();
-  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1"]);
-  const boxCalls = ctx.calls.filter((c) => c[0] === "strokeRect");
-  assert.equal(boxCalls[0][1], 24);
-  assert.equal(boxCalls[0][2], 24);
+  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Carry: 220 yds"]);
+  // No origin tracked yet - no rotation, and translate lands at the fixed
+  // startX/startY corner (stacked by lineHeight).
+  const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate");
+  assert.ok(rotateCalls.every((c) => c[1] === 0));
+  const translateCalls = ctx.calls.filter((c) => c[0] === "translate");
+  assert.equal(translateCalls[0][1], 24);
+  assert.equal(translateCalls[0][2], 24);
+  assert.ok(translateCalls[1][2] > translateCalls[0][2], "expected the second stat further down the fallback list");
 });
