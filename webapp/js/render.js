@@ -28,19 +28,29 @@
 
   /**
    * Map a normalized shot-path point ({x in [-1,1], y in [0,1]}) to canvas
-   * pixel coordinates. Impact point sits at the horizontal center, near
-   * the bottom of the canvas; +y draws upward (away from the golfer).
+   * pixel coordinates. Impact point sits at the horizontal center; +y
+   * draws upward (away from the golfer, ball-flight territory), using
+   * topMarginPx as the gap reserved above the y=1 ball-flight ceiling.
+   * Negative y (behind the impact point, where the clubhead approaches
+   * from - see clubhead.js) is its own dedicated zone below the origin,
+   * sized by bottomMarginPx/belowOriginPxPerUnit, so the swing has real
+   * visible room instead of being squeezed into a thin sliver at the
+   * canvas edge.
    */
   function shotPointToCanvas(pt, width, height, options) {
-    const opts = Object.assign({ marginPx: 40, xRangeFrac: 0.42 }, options || {});
+    const opts = Object.assign(
+      { topMarginPx: 40, bottomMarginPx: 200, xRangeFrac: 0.42, belowOriginPxPerUnit: 700 },
+      options || {}
+    );
     const cx = width / 2;
-    const originY = height - opts.marginPx;
-    const usableHeight = height - opts.marginPx * 2;
+    const originY = height - opts.bottomMarginPx;
+    const usableHeight = height - opts.bottomMarginPx - opts.topMarginPx;
     const usableHalfWidth = width * opts.xRangeFrac;
+    const y = pt.y >= 0 ? originY - pt.y * usableHeight : originY - pt.y * opts.belowOriginPxPerUnit;
 
     return {
       x: cx + pt.x * usableHalfWidth,
-      y: originY - pt.y * usableHeight,
+      y,
     };
   }
 
@@ -101,6 +111,51 @@
     ctx.stroke();
   }
 
+  /**
+   * Draw the clubhead as a thin wireframe outline (matching the alignment
+   * line's line-art style, not a filled/solid shape) at its current
+   * animated position and face angle. `clubheadState` is from
+   * clubhead.js's computeClubheadState(); `frame` is from
+   * sampleClubheadFrame() for the current animation progress. At impact,
+   * draws the toe/heel/high/low contact-point marker on the face.
+   */
+  function drawClubhead(ctx, width, height, clubheadState, frame, options) {
+    const opts = Object.assign({ faceHalfWidthPx: 32, bodyDepthPx: 24 }, options || {});
+    const pos = shotPointToCanvas(frame.position, width, height, options);
+
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate((frame.faceAngleDeg * Math.PI) / 180);
+
+    ctx.strokeStyle = COLORS.shotPath;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(-opts.faceHalfWidthPx, 0);
+    ctx.lineTo(opts.faceHalfWidthPx, 0);
+    ctx.quadraticCurveTo(0, opts.bodyDepthPx * 1.4, -opts.faceHalfWidthPx, 0);
+    ctx.closePath();
+    ctx.stroke();
+
+    if (frame.atImpact) {
+      const markerX = clubheadState.horizontalImpactNorm * opts.faceHalfWidthPx;
+      ctx.fillStyle = COLORS.shotHead;
+      ctx.beginPath();
+      ctx.arc(markerX, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    if (frame.atImpact && clubheadState.label) {
+      ctx.fillStyle = COLORS.text;
+      ctx.font = "bold 16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(clubheadState.label, pos.x, pos.y - opts.faceHalfWidthPx - 6);
+    }
+  }
+
   function drawStatsOverlay(ctx, width, stats) {
     ctx.fillStyle = COLORS.text;
     ctx.font = "bold 34px sans-serif";
@@ -117,6 +172,7 @@
     shotPointToCanvas,
     drawShotPath,
     drawAlignmentLine,
+    drawClubhead,
     drawStatsOverlay,
   };
 });

@@ -15,6 +15,14 @@ plan's "browser in kiosk mode" recommendation):
   This is a **stylized reconstruction**, not a physics simulation — see
   the project plan's framing note. No DOM dependency, so it's unit
   tested directly under Node (`tests/webapp/test_animation.js`).
+- `js/clubhead.js` — the same stylized-reconstruction approach applied to
+  the swing itself: a clubhead approaches along `ClubData.Path`, its face
+  angle closing from an extrapolated open position into `FaceToTarget` at
+  the rate implied by `ClosureRate`, and an impact-point marker shows
+  where on the face contact happened (`HorizontalFaceImpact` /
+  `VerticalFaceImpact`) — the actual origin of gear-effect curvature,
+  called out as "TOE STRIKE" / "HEEL STRIKE" / "HIGH FACE" / "LOW FACE"
+  past a threshold. Unit tested in `tests/webapp/test_clubhead.js`.
 - `js/render.js` — canvas drawing: pure-black background, the
   camera-tracked alignment line (lime), the animated shot path (white,
   progressively revealed with an ease-out curve), and a 2-3 line stat

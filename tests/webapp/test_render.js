@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const FocusRender = require("../../webapp/js/render.js");
+const FocusClubhead = require("../../webapp/js/clubhead.js");
 
 function makeMockCtx() {
   const calls = [];
@@ -10,10 +11,16 @@ function makeMockCtx() {
     beginPath() { calls.push(["beginPath"]); },
     moveTo(...args) { calls.push(["moveTo", ...args]); },
     lineTo(...args) { calls.push(["lineTo", ...args]); },
+    quadraticCurveTo(...args) { calls.push(["quadraticCurveTo", ...args]); },
+    closePath() { calls.push(["closePath"]); },
     stroke() { calls.push(["stroke"]); },
     arc(...args) { calls.push(["arc", ...args]); },
     fill() { calls.push(["fill"]); },
     fillText(...args) { calls.push(["fillText", ...args]); },
+    save() { calls.push(["save"]); },
+    restore() { calls.push(["restore"]); },
+    translate(...args) { calls.push(["translate", ...args]); },
+    rotate(...args) { calls.push(["rotate", ...args]); },
     set fillStyle(v) {},
     set strokeStyle(v) {},
     set lineWidth(v) {},
@@ -30,7 +37,7 @@ test("shotPointToCanvas maps impact point (0,0) to bottom-center minus margin", 
   const height = 600;
   const pt = FocusRender.shotPointToCanvas({ x: 0, y: 0 }, width, height);
   assert.equal(pt.x, width / 2);
-  assert.equal(pt.y, height - 40); // default marginPx
+  assert.equal(pt.y, height - 200); // default bottomMarginPx
 });
 
 test("shotPointToCanvas maps positive x to the right half of the canvas", () => {
@@ -41,7 +48,27 @@ test("shotPointToCanvas maps positive x to the right half of the canvas", () => 
 test("shotPointToCanvas maps y=1 near the top margin", () => {
   const height = 600;
   const pt = FocusRender.shotPointToCanvas({ x: 0, y: 1 }, 800, height);
-  assert.equal(pt.y, 40); // marginPx from the top
+  assert.equal(pt.y, 40); // default topMarginPx
+});
+
+test("shotPointToCanvas keeps negative y (clubhead approach zone) within canvas bounds", () => {
+  // Regression test: negative y used to reuse the ball-flight scale
+  // (usableHeight), which pushed clubhead approach positions below the
+  // bottom edge of the canvas entirely.
+  const width = 1920, height = 1080;
+  const pt = FocusRender.shotPointToCanvas({ x: 0, y: -0.18 }, width, height);
+  assert.ok(pt.y < height, `expected y to stay within the canvas (height=${height}), got ${pt.y}`);
+});
+
+test("shotPointToCanvas gives the clubhead approach zone clearly visible travel distance", () => {
+  // The whole point of the bottomMarginPx/belowOriginPxPerUnit split is
+  // that the swing isn't squeezed into an unnoticeable sliver near the
+  // canvas edge - assert it covers a real, visible number of pixels.
+  const width = 1920, height = 1080;
+  const origin = FocusRender.shotPointToCanvas({ x: 0, y: 0 }, width, height);
+  const approachStart = FocusRender.shotPointToCanvas({ x: 0, y: -0.18 }, width, height);
+  const travelPx = approachStart.y - origin.y;
+  assert.ok(travelPx > 80, `expected clubhead approach travel to be clearly visible (>80px), got ${travelPx}px`);
 });
 
 test("drawShotPath draws nothing until at least 2 points are revealed", () => {
@@ -96,4 +123,44 @@ test("drawStatsOverlay writes one fillText call per stat line", () => {
   FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Smash Factor: 1.48"]);
   const textCalls = ctx.calls.filter((c) => c[0] === "fillText");
   assert.equal(textCalls.length, 2);
+});
+
+test("drawClubhead strokes a wireframe outline (no fill) at every frame", () => {
+  const ctx = makeMockCtx();
+  const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };
+  const state = FocusClubhead.computeClubheadState(shot);
+  const frame = FocusClubhead.sampleClubheadFrame(state, 0.5);
+
+  FocusRender.drawClubhead(ctx, 800, 600, state, frame);
+
+  assert.ok(ctx.calls.some((c) => c[0] === "stroke"));
+  assert.ok(ctx.calls.some((c) => c[0] === "translate"));
+  assert.ok(ctx.calls.some((c) => c[0] === "rotate"));
+  // Not at impact yet - no marker dot (fill/arc) should be drawn.
+  assert.ok(!ctx.calls.some((c) => c[0] === "arc"));
+});
+
+test("drawClubhead draws the impact marker only once atImpact is true", () => {
+  const ctx = makeMockCtx();
+  const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0.6, VerticalFaceImpact: 0 } };
+  const state = FocusClubhead.computeClubheadState(shot);
+  const frame = FocusClubhead.sampleClubheadFrame(state, 1);
+
+  FocusRender.drawClubhead(ctx, 800, 600, state, frame);
+
+  assert.ok(ctx.calls.some((c) => c[0] === "arc"), "expected an impact marker dot to be drawn at impact");
+  const textCalls = ctx.calls.filter((c) => c[0] === "fillText");
+  assert.equal(textCalls.length, 1);
+  assert.equal(textCalls[0][1], "TOE STRIKE");
+});
+
+test("drawClubhead draws no label text for a flush, centered strike", () => {
+  const ctx = makeMockCtx();
+  const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };
+  const state = FocusClubhead.computeClubheadState(shot);
+  const frame = FocusClubhead.sampleClubheadFrame(state, 1);
+
+  FocusRender.drawClubhead(ctx, 800, 600, state, frame);
+
+  assert.equal(ctx.calls.filter((c) => c[0] === "fillText").length, 0);
 });

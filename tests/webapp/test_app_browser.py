@@ -124,3 +124,45 @@ def test_injected_shot_draws_visible_pixels_on_canvas(server_url, browser):
     )
     assert result != [0, 0, 0], "expected the shot path to paint non-black pixels"
     page.close()
+
+
+def test_clubhead_approach_and_impact_marker_render_on_real_canvas(server_url, browser):
+    page = browser.new_page()
+    page.route("**/api/config", lambda route: route.fulfill(status=404, body="not found"))
+    page.goto(f"{server_url}/index.html")
+    page.wait_for_timeout(300)
+
+    result = page.evaluate(
+        """() => {
+            const canvas = document.getElementById('field');
+            const ctx = canvas.getContext('2d');
+
+            const shot = { ClubData: { Path: 8, FaceToTarget: -2, ClosureRate: 250,
+                                        HorizontalFaceImpact: 0.6, VerticalFaceImpact: 0 } };
+            const state = FocusClubhead.computeClubheadState(shot);
+
+            FocusRender.clearCanvas(ctx, canvas.width, canvas.height);
+            const midFrame = FocusClubhead.sampleClubheadFrame(state, 0.5);
+            FocusRender.drawClubhead(ctx, canvas.width, canvas.height, state, midFrame);
+            const midPos = FocusRender.shotPointToCanvas(midFrame.position, canvas.width, canvas.height);
+            // Scan a box around the clubhead center for any non-black pixel - robust
+            // to the wireframe's rotation angle, which varies with ClosureRate/progress.
+            const box = ctx.getImageData(Math.round(midPos.x - 30), Math.round(midPos.y - 30), 60, 60).data;
+            let midHit = false;
+            for (let i = 0; i < box.length; i += 4) {
+                if (box[i] || box[i + 1] || box[i + 2]) { midHit = true; break; }
+            }
+
+            FocusRender.clearCanvas(ctx, canvas.width, canvas.height);
+            const impactFrame = FocusClubhead.sampleClubheadFrame(state, 1);
+            FocusRender.drawClubhead(ctx, canvas.width, canvas.height, state, impactFrame);
+            const impactPos = FocusRender.shotPointToCanvas(impactFrame.position, canvas.width, canvas.height);
+            const markerX = impactPos.x + state.horizontalImpactNorm * 22;
+            const markerData = ctx.getImageData(Math.round(markerX), Math.round(impactPos.y), 1, 1).data;
+
+            return { midHit, marker: [markerData[0], markerData[1], markerData[2]] };
+        }"""
+    )
+    assert result["midHit"], "expected the clubhead wireframe to paint visible pixels mid-approach"
+    assert result["marker"] != [0, 0, 0], "expected the toe/heel impact marker to paint a visible pixel at impact"
+    page.close()

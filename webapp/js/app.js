@@ -6,7 +6,8 @@
 (function () {
   "use strict";
 
-  const ANIMATION_DURATION_MS = 900;
+  const APPROACH_DURATION_MS = 350; // clubhead swinging in and closing the face
+  const FLIGHT_DURATION_MS = 900; // ball-flight trace
 
   const canvas = document.getElementById("field");
   const ctx = canvas.getContext("2d");
@@ -18,6 +19,7 @@
   let latestMatState = null;
   let currentShot = null;
   let currentPath = [];
+  let currentClubheadState = null;
   let animationStartMs = null;
 
   function setConnectionStatus(connected) {
@@ -53,6 +55,7 @@
   function onShot(shot) {
     currentShot = shot;
     currentPath = FocusAnim.sampleShotPath(shot, {}, 60);
+    currentClubheadState = FocusClubhead.computeClubheadState(shot);
     animationStartMs = performance.now();
   }
 
@@ -76,10 +79,21 @@
 
     if (currentShot && animationStartMs !== null) {
       const elapsed = nowMs - animationStartMs;
-      const rawProgress = Math.min(1, elapsed / ANIMATION_DURATION_MS);
-      const progress = FocusAnim.easeOutCubic(rawProgress);
-      FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress);
-      FocusRender.drawStatsOverlay(ctx, canvas.width, FocusStats.buildStatLines(currentShot, statIds));
+
+      if (elapsed < APPROACH_DURATION_MS) {
+        const approachProgress = elapsed / APPROACH_DURATION_MS;
+        const frame = FocusClubhead.sampleClubheadFrame(currentClubheadState, approachProgress);
+        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, frame);
+      } else {
+        const impactFrame = FocusClubhead.sampleClubheadFrame(currentClubheadState, 1);
+        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, impactFrame);
+
+        const flightElapsed = elapsed - APPROACH_DURATION_MS;
+        const rawProgress = Math.min(1, flightElapsed / FLIGHT_DURATION_MS);
+        const progress = FocusAnim.easeOutCubic(rawProgress);
+        FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress);
+        FocusRender.drawStatsOverlay(ctx, canvas.width, FocusStats.buildStatLines(currentShot, statIds));
+      }
     }
 
     requestAnimationFrame(renderFrame);
