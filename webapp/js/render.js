@@ -45,11 +45,16 @@
    */
   function shotPointToCanvas(pt, width, height, options) {
     const opts = Object.assign(
-      { topMarginPx: 40, bottomMarginPx: 260, xRangeFrac: 0.42, belowOriginPxPerUnit: 700 },
+      { topMarginPx: 40, bottomMarginPx: 260, xRangeFrac: 0.42, belowOriginPxPerUnit: 700, originPx: null },
       options || {}
     );
-    const cx = width / 2;
-    const originY = height - opts.bottomMarginPx;
+    // originPx lets callers anchor the whole shot-space animation (target
+    // line, clubhead, ball flight) at a real tracked canvas position - e.g.
+    // the golfer's actual ball position, computed from their tracked feet
+    // (see computeBallMatPosition) - instead of a fixed canvas point that's
+    // unrelated to where they're actually standing.
+    const cx = opts.originPx ? opts.originPx.x : width / 2;
+    const originY = opts.originPx ? opts.originPx.y : height - opts.bottomMarginPx;
     const usableHeight = height - opts.bottomMarginPx - opts.topMarginPx;
     const usableHalfWidth = width * opts.xRangeFrac;
     const y = pt.y >= 0 ? originY - pt.y * usableHeight : originY - pt.y * opts.belowOriginPxPerUnit;
@@ -154,6 +159,45 @@
     return {
       x: (pt.x / matSize.widthMm) * width,
       y: height - (pt.y / matSize.heightMm) * height,
+    };
+  }
+
+  /**
+   * A golfer doesn't stand over the ball - at address the ball sits out in
+   * front of their toes, roughly a club-length away, not between/under the
+   * feet. Real-world reference (address-position measurements): stance is
+   * offset from the ball by ~22-26in for a mid-iron (~24in avg) up to
+   * ~32-36in for a driver; here we default to ~600mm (~24in, mid-iron)
+   * since we don't track which club is in play.
+   *
+   * `footMatPoints` is the tracked [left, right] pair in mat-space mm.
+   * Returns the estimated ball position in the same mat-space, offset
+   * perpendicular to the stance line (across the golfer's toe-line, into
+   * the space in front of them) rather than sitting on the stance line
+   * itself. `options.side` flips which perpendicular direction is "in
+   * front of the golfer" - this depends on which way the golfer faces
+   * relative to the mat's coordinate axes, a physical-setup detail fixed
+   * at calibration time, not something derivable from two foot points alone.
+   */
+  function computeBallMatPosition(footMatPoints, options) {
+    const opts = Object.assign({ perpendicularOffsetMm: 600, forwardOffsetMm: 0, side: 1 }, options || {});
+    const [left, right] = footMatPoints;
+    const midX = (left.x + right.x) / 2;
+    const midY = (left.y + right.y) / 2;
+
+    const dx = right.x - left.x;
+    const dy = right.y - left.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const stanceUx = dx / len;
+    const stanceUy = dy / len;
+    // Rotate the stance-line direction 90deg to get the direction across
+    // it, toward the ball.
+    const perpUx = -stanceUy * opts.side;
+    const perpUy = stanceUx * opts.side;
+
+    return {
+      x: midX + perpUx * opts.perpendicularOffsetMm + stanceUx * opts.forwardOffsetMm,
+      y: midY + perpUy * opts.perpendicularOffsetMm + stanceUy * opts.forwardOffsetMm,
     };
   }
 
@@ -325,11 +369,25 @@
    * Stat overlay: each stat in its own bordered box (thin outline, label
    * top, big tabular-numeral value below), rather than free-floating text.
    * `stats` is the array of "Label: value" strings from stat-catalog.js's
-   * buildStatLines().
+   * buildStatLines(). When `options.origin` (a canvas-pixel point) is
+   * given, the stack anchors just off to the side of that point - the
+   * golfer's actual ball position - the way a real display's numbers sit
+   * next to the ball rather than pinned to a screen corner regardless of
+   * where the golfer is standing. Falls back to a fixed top-left position
+   * when no origin is tracked yet.
    */
   function drawStatsOverlay(ctx, width, stats, options) {
-    const opts = Object.assign({ boxWidth: 210, boxHeight: 64, gap: 10, startX: 24, startY: 24 }, options || {});
-    let y = opts.startY;
+    const opts = Object.assign(
+      { boxWidth: 210, boxHeight: 64, gap: 10, startX: 24, startY: 24, origin: null, originGapX: 40, originGapY: 20 },
+      options || {}
+    );
+    const totalHeight = stats.length * opts.boxHeight + Math.max(0, stats.length - 1) * opts.gap;
+    const startX = opts.origin ? opts.origin.x + opts.originGapX : opts.startX;
+    // Stack ends just above the ball position (boxes read upward toward
+    // the flight path) rather than starting at the ball and running off
+    // the bottom of the screen.
+    const startY = opts.origin ? opts.origin.y - opts.originGapY - totalHeight : opts.startY;
+    let y = startY;
 
     stats.forEach((line) => {
       const separatorIndex = line.indexOf(": ");
@@ -338,19 +396,19 @@
 
       ctx.strokeStyle = COLORS.boxBorder;
       ctx.lineWidth = 1;
-      ctx.strokeRect(opts.startX, y, opts.boxWidth, opts.boxHeight);
+      ctx.strokeRect(startX, y, opts.boxWidth, opts.boxHeight);
 
       ctx.fillStyle = COLORS.textDim;
       ctx.font = "600 12px ui-sans-serif, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.letterSpacing = "2px";
-      ctx.fillText(label.toUpperCase(), opts.startX + 14, y + 10);
+      ctx.fillText(label.toUpperCase(), startX + 14, y + 10);
       ctx.letterSpacing = "0px";
 
       ctx.fillStyle = COLORS.text;
       ctx.font = "700 28px ui-monospace, 'SF Mono', Consolas, monospace";
-      ctx.fillText(value, opts.startX + 14, y + 28);
+      ctx.fillText(value, startX + 14, y + 28);
 
       y += opts.boxHeight + opts.gap;
     });
@@ -361,6 +419,7 @@
     clearCanvas,
     shotPointToCanvas,
     matPointToCanvas,
+    computeBallMatPosition,
     drawDistanceGuides,
     drawTargetLine,
     drawShotPath,

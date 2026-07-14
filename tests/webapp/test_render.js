@@ -284,3 +284,64 @@ test("drawFootOutlines does nothing when no feet are detected", () => {
   FocusRender.drawFootOutlines(ctx, 800, 600, null, { widthMm: 1000, heightMm: 1500 });
   assert.equal(ctx.calls.length, 0);
 });
+
+test("computeBallMatPosition offsets the ball away from the stance line, not on top of it", () => {
+  // Regression test: the golfer doesn't stand with the ball between/under
+  // their feet - real address positions put the ball out in front of the
+  // toe-line by roughly a club length.
+  const feet = [{ x: 500, y: 700 }, { x: 500, y: 800 }]; // square stance, parallel to mat y-axis
+  const ball = FocusRender.computeBallMatPosition(feet);
+
+  const midX = 500;
+  const midY = 750;
+  const distFromMidpoint = Math.hypot(ball.x - midX, ball.y - midY);
+  assert.ok(distFromMidpoint > 100, `expected the ball to sit well off the stance midpoint, got ${distFromMidpoint}mm away`);
+});
+
+test("computeBallMatPosition offsets perpendicular to the stance line direction", () => {
+  const feet = [{ x: 500, y: 700 }, { x: 500, y: 800 }]; // stance line runs along mat y (dx=0)
+  const ball = FocusRender.computeBallMatPosition(feet);
+  // Perpendicular to a dy-only stance line is a dx-only offset.
+  assert.ok(Math.abs(ball.x - 500) > 100, "expected the offset to be along mat x (perpendicular to the stance line)");
+  assert.ok(Math.abs(ball.y - 750) < 1e-6, "expected no offset along the stance line's own direction by default");
+});
+
+test("shotPointToCanvas honors an originPx override instead of the fixed default origin", () => {
+  const width = 800;
+  const height = 600;
+  const originPx = { x: 300, y: 450 };
+  const pt = FocusRender.shotPointToCanvas({ x: 0, y: 0 }, width, height, { originPx });
+  assert.equal(pt.x, 300);
+  assert.equal(pt.y, 450);
+});
+
+test("shotPointToCanvas falls back to the default origin when no originPx is given", () => {
+  const width = 800;
+  const height = 600;
+  const pt = FocusRender.shotPointToCanvas({ x: 0, y: 0 }, width, height, {});
+  assert.equal(pt.x, width / 2);
+  assert.equal(pt.y, height - 260);
+});
+
+test("drawStatsOverlay anchors the stack beside a given origin instead of the fixed corner", () => {
+  const ctx = makeMockCtx();
+  const origin = { x: 500, y: 400 };
+  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Carry: 220 yds"], { origin });
+
+  const boxCalls = ctx.calls.filter((c) => c[0] === "strokeRect");
+  assert.equal(boxCalls.length, 2);
+  // Anchored to the right of the origin's x, not the fixed startX=24 corner.
+  assert.ok(boxCalls[0][1] > origin.x, `expected box x > origin.x (${origin.x}), got ${boxCalls[0][1]}`);
+  // The stack ends just above the origin's y (boxes read upward toward the
+  // flight path), not below the fixed startY=24 corner.
+  const lastBoxBottom = boxCalls[1][2] + boxCalls[1][4];
+  assert.ok(lastBoxBottom <= origin.y, `expected the stack to end at/above origin.y (${origin.y}), got bottom=${lastBoxBottom}`);
+});
+
+test("drawStatsOverlay falls back to the fixed top-left corner when no origin is given", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1"]);
+  const boxCalls = ctx.calls.filter((c) => c[0] === "strokeRect");
+  assert.equal(boxCalls[0][1], 24);
+  assert.equal(boxCalls[0][2], 24);
+});

@@ -67,16 +67,26 @@
   function renderFrame(nowMs) {
     FocusRender.clearCanvas(ctx, canvas.width, canvas.height);
 
+    // Anchor the whole shot-space animation (target line, clubhead, ball
+    // flight, stat boxes) beside the golfer's actual tracked ball position,
+    // instead of a fixed canvas point unrelated to where they're standing.
+    let originPx = null;
+
     if (latestMatState && latestMatState.foot_mat_points_mm) {
       const [left, right] = latestMatState.foot_mat_points_mm;
       const feet = [{ x: left[0], y: left[1] }, { x: right[0], y: right[1] }];
       FocusRender.drawAlignmentLine(ctx, canvas.width, canvas.height, feet, matSize);
       FocusRender.drawFootOutlines(ctx, canvas.width, canvas.height, feet, matSize);
+
+      const ballMatPosition = FocusRender.computeBallMatPosition(feet);
+      originPx = FocusRender.matPointToCanvas(ballMatPosition, canvas.width, canvas.height, matSize);
     }
 
+    const shotOptions = originPx ? { originPx } : undefined;
+
     if (currentShot) {
-      FocusRender.drawDistanceGuides(ctx, canvas.width, canvas.height);
-      FocusRender.drawTargetLine(ctx, canvas.width, canvas.height);
+      FocusRender.drawDistanceGuides(ctx, canvas.width, canvas.height, shotOptions);
+      FocusRender.drawTargetLine(ctx, canvas.width, canvas.height, shotOptions);
     }
 
     if (currentShot && animationStartMs !== null) {
@@ -85,21 +95,26 @@
       if (elapsed < APPROACH_DURATION_MS) {
         const approachProgress = elapsed / APPROACH_DURATION_MS;
         const frame = FocusClubhead.sampleClubheadFrame(currentClubheadState, approachProgress);
-        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, frame);
+        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, frame, shotOptions);
       } else {
         // Follow-through and ball flight happen concurrently, like a real
         // swing: the ball's already gone while the golfer keeps swinging.
         const postImpactElapsed = elapsed - APPROACH_DURATION_MS;
         const followThroughProgress = Math.min(1, postImpactElapsed / FOLLOW_THROUGH_DURATION_MS);
         const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
-        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame);
+        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame, shotOptions);
 
         const rawProgress = Math.min(1, postImpactElapsed / FLIGHT_DURATION_MS);
         const progress = FocusAnim.easeOutCubic(rawProgress);
         const carry = currentShot.BallData && currentShot.BallData.CarryDistance;
         const landingLabel = typeof carry === "number" ? `${Math.round(carry)} YDS` : null;
-        FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress, { landingLabel });
-        FocusRender.drawStatsOverlay(ctx, canvas.width, FocusStats.buildStatLines(currentShot, statIds));
+        FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress, Object.assign({}, shotOptions, { landingLabel }));
+        FocusRender.drawStatsOverlay(
+          ctx,
+          canvas.width,
+          FocusStats.buildStatLines(currentShot, statIds),
+          originPx ? { origin: originPx } : undefined
+        );
       }
     }
 
