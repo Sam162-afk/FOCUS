@@ -22,6 +22,9 @@
     textDim: "#9a9d8f",
     gridLine: "rgba(74, 222, 128, 0.14)",
     gridLabel: "rgba(154, 157, 143, 0.65)",
+    targetLine: "rgba(245, 242, 234, 0.32)", // neutral dashed reference, distinct from the tracked stance line
+    faceLine: "rgba(255, 176, 32, 0.55)", // dashed amber - ties to the impact-derived data family
+    boxBorder: "rgba(245, 242, 234, 0.3)",
   };
 
   function clearCanvas(ctx, width, height) {
@@ -78,6 +81,51 @@
       ctx.stroke();
       ctx.fillText(`${yds}`, width - 16, pt.y - 10);
     }
+  }
+
+  /**
+   * The fixed, ideal aim line (straight toward the target, independent of
+   * any particular shot or the golfer's actual stance) - a dashed neutral
+   * reference distinct from both the tracked stance line (green, real) and
+   * the shot trace (white, outcome).
+   */
+  function drawTargetLine(ctx, width, height, options) {
+    const origin = shotPointToCanvas({ x: 0, y: 0 }, width, height, options);
+    ctx.save();
+    ctx.strokeStyle = COLORS.targetLine;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 7]);
+    ctx.beginPath();
+    ctx.moveTo(origin.x, origin.y);
+    ctx.lineTo(origin.x, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * Where the clubface was actually aimed at impact: a dashed line through
+   * the impact point at faceAngleDeg, extended both toward the target and
+   * back through the clubhead, so you can see face-to-target versus the
+   * fixed target line at a glance. Computed directly in canvas-pixel space
+   * (not normalized shot-space) so it stays perfectly straight through the
+   * approach/flight zones, which use different pixel-per-unit scales.
+   */
+  function drawFaceLine(ctx, width, height, faceAngleDeg, options) {
+    const pos = shotPointToCanvas({ x: 0, y: 0 }, width, height, options);
+    const angleRad = (faceAngleDeg * Math.PI) / 180;
+    const dirX = Math.sin(angleRad);
+    const dirY = -Math.cos(angleRad);
+    const extend = Math.max(width, height) * 1.5;
+
+    ctx.save();
+    ctx.strokeStyle = COLORS.faceLine;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    ctx.moveTo(pos.x - dirX * extend, pos.y - dirY * extend);
+    ctx.lineTo(pos.x + dirX * extend, pos.y + dirY * extend);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawShotPath(ctx, width, height, pathPoints, progress, options) {
@@ -277,32 +325,37 @@
   }
 
   /**
-   * Stat overlay with real typographic hierarchy: a small letter-spaced
-   * uppercase label over a large tabular-numeral value, rather than a flat
-   * "Label: value" line. `stats` is the array of "Label: value" strings
-   * from stat-catalog.js's buildStatLines().
+   * Stat overlay: each stat in its own bordered box (thin outline, label
+   * top, big tabular-numeral value below), rather than free-floating text.
+   * `stats` is the array of "Label: value" strings from stat-catalog.js's
+   * buildStatLines().
    */
-  function drawStatsOverlay(ctx, width, stats) {
-    const startX = 28;
-    let y = 26;
+  function drawStatsOverlay(ctx, width, stats, options) {
+    const opts = Object.assign({ boxWidth: 210, boxHeight: 64, gap: 10, startX: 24, startY: 24 }, options || {});
+    let y = opts.startY;
+
     stats.forEach((line) => {
       const separatorIndex = line.indexOf(": ");
       const label = separatorIndex === -1 ? line : line.slice(0, separatorIndex);
       const value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 2);
 
+      ctx.strokeStyle = COLORS.boxBorder;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(opts.startX, y, opts.boxWidth, opts.boxHeight);
+
       ctx.fillStyle = COLORS.textDim;
-      ctx.font = "600 13px ui-sans-serif, sans-serif";
+      ctx.font = "600 12px ui-sans-serif, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.letterSpacing = "2px";
-      ctx.fillText(label.toUpperCase(), startX, y);
+      ctx.fillText(label.toUpperCase(), opts.startX + 14, y + 10);
       ctx.letterSpacing = "0px";
 
       ctx.fillStyle = COLORS.text;
-      ctx.font = "700 32px ui-monospace, 'SF Mono', Consolas, monospace";
-      ctx.fillText(value, startX, y + 16);
+      ctx.font = "700 28px ui-monospace, 'SF Mono', Consolas, monospace";
+      ctx.fillText(value, opts.startX + 14, y + 28);
 
-      y += 66;
+      y += opts.boxHeight + opts.gap;
     });
   }
 
@@ -311,6 +364,8 @@
     clearCanvas,
     shotPointToCanvas,
     drawDistanceGuides,
+    drawTargetLine,
+    drawFaceLine,
     drawShotPath,
     drawAlignmentLine,
     drawFootOutlines,

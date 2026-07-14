@@ -21,6 +21,8 @@ function makeMockCtx() {
     restore() { calls.push(["restore"]); },
     translate(...args) { calls.push(["translate", ...args]); },
     rotate(...args) { calls.push(["rotate", ...args]); },
+    strokeRect(...args) { calls.push(["strokeRect", ...args]); },
+    setLineDash(...args) { calls.push(["setLineDash", ...args]); },
     set fillStyle(v) {},
     set strokeStyle(v) {},
     set lineWidth(v) {},
@@ -133,6 +135,47 @@ test("drawStatsOverlay writes a label and a value fillText call per stat line", 
   assert.ok(texts.includes("2.1"));
   assert.ok(texts.includes("SMASH FACTOR"));
   assert.ok(texts.includes("1.48"));
+});
+
+test("drawStatsOverlay draws one bordered box per stat", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Smash Factor: 1.48", "Carry: 220 yds"]);
+  const boxCalls = ctx.calls.filter((c) => c[0] === "strokeRect");
+  assert.equal(boxCalls.length, 3);
+
+  // Boxes stack vertically without overlapping.
+  const tops = boxCalls.map((c) => c[2]);
+  assert.ok(tops[1] > tops[0]);
+  assert.ok(tops[2] > tops[1]);
+});
+
+test("drawTargetLine draws a single vertical reference line from the impact point", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawTargetLine(ctx, 800, 600);
+  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
+  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
+  assert.ok(moveTo && lineTo);
+  // Straight up: same x for both ends, lineTo reaches the canvas top.
+  assert.equal(moveTo[1], lineTo[1]);
+  assert.equal(lineTo[2], 0);
+});
+
+test("drawFaceLine draws a straight dashed line through the impact point at the given angle", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawFaceLine(ctx, 800, 600, 0);
+  assert.ok(ctx.calls.some((c) => c[0] === "setLineDash"));
+  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
+  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
+  // A square (0deg) face line is vertical, same as the target line.
+  assert.ok(Math.abs(moveTo[1] - lineTo[1]) < 1e-9);
+});
+
+test("drawFaceLine tilts sideways for a nonzero face angle", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawFaceLine(ctx, 800, 600, 20);
+  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
+  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
+  assert.notEqual(moveTo[1], lineTo[1]);
 });
 
 test("drawClubhead strokes a wireframe outline (no fill) at every frame", () => {
