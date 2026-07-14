@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>FOCUS Clone — Setup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/setup.css" />
+</head>
+<body>
+  <main id="wizard">
+    <h1>FOCUS Clone Setup</h1>
+    <div id="steps-nav">
+      <span class="step-dot" data-step="0">1. Mat size</span>
+      <span class="step-dot" data-step="1">2. Stats</span>
+      <span class="step-dot" data-step="2">3. Projector</span>
+      <span class="step-dot" data-step="3">4. Review</span>
+    </div>
+
+    <section id="step-0" class="step">
+      <h2>Mat size</h2>
+      <p>Measure the hitting mat / marker rectangle you set up.</p>
+      <label>Width (mm) <input type="number" id="mat-width" value="1000" min="1" /></label>
+      <label>Height (mm) <input type="number" id="mat-height" value="1500" min="1" /></label>
+    </section>
+
+    <section id="step-1" class="step hidden">
+      <h2>Choose up to 3 stats</h2>
+      <p>These display on-screen after each shot.</p>
+      <div id="stat-options"></div>
+    </section>
+
+    <section id="step-2" class="step hidden">
+      <h2>Projector calibration</h2>
+      <p>
+        Drag each corner handle until the grid below looks like a perfect
+        rectangle <strong>on the actual floor</strong> (open this page on the
+        kiosk PC and look at the real projection while you drag, or have
+        someone watch the floor and call out adjustments). This is a "corner
+        pin": you're directly correcting for the projector's keystone/angle,
+        no camera or photo needed.
+      </p>
+      <div id="calibration-canvas-wrap">
+        <canvas id="calibration-canvas" width="800" height="450"></canvas>
+      </div>
+      <button type="button" id="reset-corners">Reset to no correction</button>
+      <p class="hint">Skip this step if you don't have the projector connected yet — it'll render un-warped until you calibrate later from this same page.</p>
+    </section>
+
+    <section id="step-3" class="step hidden">
+      <h2>Review &amp; save</h2>
+      <pre id="review-summary"></pre>
+      <button type="button" id="save-btn">Save setup</button>
+      <p id="save-status"></p>
+    </section>
+
+    <div id="nav-buttons">
+      <button type="button" id="back-btn">Back</button>
+      <button type="button" id="next-btn">Next</button>
+    </div>
+  </main>
+
+  <script src="js/animation.js"></script>
+  <script src="js/stat-catalog.js"></script>
+  <script src="js/wizard-logic.js"></script>
+  <script src="js/setup.js"></script>
+</body>
+</html>

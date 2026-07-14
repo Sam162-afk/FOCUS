@@ -21,44 +21,52 @@ below for details and exact next steps.
 | 4 | Ball-flight/impact reconstruction | Built + tested (part of Phase 5's `animation.js`) | `docs/phase5-6-renderer-and-bridge.md` |
 | 5 | Kiosk web renderer | Built + tested (Node + headless Chromium) | `docs/phase5-6-renderer-and-bridge.md` |
 | 6 | Bridge server (wires everything together) | Built + tested, verified end-to-end | `docs/phase5-6-renderer-and-bridge.md` |
-| 7 | On-site polish | Not started — needs real hardware | — |
+| 7 | Productization (launcher, setup wizard) | Built + tested | `docs/phase7-productization.md` |
 
 ## Layout
 
 - `proxy/` — GSPro TCP data-tap proxy + fake GSPro/Club Optix test doubles
 - `vision/` — ArUco mat tracking, foot detection, combined mat tracker
 - `projector/` — projector keystone calibration (homography + CSS matrix3d)
-- `webapp/` — kiosk renderer (HTML/CSS/JS, no build step)
-- `bridge/` — aiohttp server: serves the webapp, tails shot/mat-state
-  files, and broadcasts updates over WebSocket
+- `webapp/` — kiosk renderer + setup wizard (HTML/CSS/JS, no build step)
+- `bridge/` — aiohttp server: serves the webapp, persists wizard settings,
+  tails shot/mat-state files, and broadcasts updates over WebSocket
+- `launcher.py` — single command that starts everything together, with
+  crash-restart and auto-opening the kiosk display in a browser
 - `tests/` — Python (pytest), Node (`node --test`), and headless-browser
   (Playwright) tests
 - `docs/` — project plan and per-phase notes
 
 ## Running the whole stack
 
+The easy way — one command starts the proxy, vision tracker, and bridge
+together, restarts anything that crashes, and opens the kiosk display:
+
 ```bash
 pip install -r requirements.txt
+python3 launcher.py --gspro-port 0920 --camera 0
+```
 
-# 1. Stand-in for GSPro (skip once real GSPro is running)
-python3 proxy/fake_gspro.py --port 0920
+Omit `--gspro-port` and/or `--camera` to run without those pieces (e.g.
+render-only development with no hardware attached yet). First time
+setup: open `http://localhost:8000/setup.html` to configure mat size,
+which stats to show, and projector calibration.
 
-# 2. GSPro data-tap proxy
+Or run each piece by hand, in order:
+
+```bash
+python3 proxy/fake_gspro.py --port 0920           # stand-in for GSPro
 python3 proxy/gspro_proxy.py --listen-port 0921 --gspro-host 127.0.0.1 --gspro-port 0920
-
-# 3. Vision tracker (camera index once mounted, or --video path for now)
-python3 -m vision.mat_tracker --camera 0
-
-# 4. Bridge server (serves the renderer + wires everything together)
+python3 -m vision.mat_tracker --camera 0          # or --video path for testing
 python3 -m bridge.server --port 8000
-
-# 5. Open a browser at http://localhost:8000/ (fullscreen/kiosk mode on the projector)
+# then open http://localhost:8000/ (fullscreen/kiosk mode on the projector)
 ```
 
 Feed sample shots without real hardware via
 `python3 proxy/fake_club_optix.py --host 127.0.0.1 --port 0921`.
 
-See `docs/phase5-6-renderer-and-bridge.md` for the full walkthrough.
+See `docs/phase5-6-renderer-and-bridge.md` for the full walkthrough and
+`docs/phase7-productization.md` for the launcher/setup wizard.
 
 ## Tests
 

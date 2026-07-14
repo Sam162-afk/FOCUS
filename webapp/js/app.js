@@ -14,6 +14,7 @@
   const statusEl = document.getElementById("connection-status");
 
   let matSize = { widthMm: 1000, heightMm: 1500 };
+  let statIds = FocusStats.DEFAULT_STAT_IDS;
   let latestMatState = null;
   let currentShot = null;
   let currentPath = [];
@@ -35,6 +36,9 @@
     if (config.cssMatrix3d) {
       stage.style.transform = config.cssMatrix3d;
     }
+    if (config.stats && config.stats.length) {
+      statIds = config.stats;
+    }
   }
 
   function loadConfig() {
@@ -44,18 +48,6 @@
       .catch(() => {
         /* no config endpoint yet (e.g. running the static files directly) - fall back to defaults */
       });
-  }
-
-  function computeStatsLines(shot) {
-    const ball = shot.BallData || {};
-    const club = shot.ClubData || {};
-    const smash = FocusAnim.smashFactor(shot);
-    const lines = [];
-    if (club.Path !== undefined) lines.push(`Club Path: ${club.Path.toFixed(1)}`);
-    if (club.FaceToTarget !== undefined) lines.push(`Face-to-Target: ${club.FaceToTarget.toFixed(1)}`);
-    if (smash !== null) lines.push(`Smash Factor: ${smash.toFixed(2)}`);
-    if (ball.CarryDistance !== undefined) lines.push(`Carry: ${Math.round(ball.CarryDistance)} yds`);
-    return lines.slice(0, 3);
   }
 
   function onShot(shot) {
@@ -87,7 +79,7 @@
       const rawProgress = Math.min(1, elapsed / ANIMATION_DURATION_MS);
       const progress = FocusAnim.easeOutCubic(rawProgress);
       FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress);
-      FocusRender.drawStatsOverlay(ctx, canvas.width, computeStatsLines(currentShot));
+      FocusRender.drawStatsOverlay(ctx, canvas.width, FocusStats.buildStatLines(currentShot, statIds));
     }
 
     requestAnimationFrame(renderFrame);

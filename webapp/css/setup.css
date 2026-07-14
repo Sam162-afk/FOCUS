@@ -1,0 +1,122 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #111;
+  color: #eee;
+  font-family: sans-serif;
+}
+
+#wizard {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 {
+  color: #39ff14;
+}
+
+#steps-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.step-dot {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #222;
+  font-size: 13px;
+  color: #888;
+}
+
+.step-dot.active {
+  background: #226622;
+  color: #fff;
+}
+
+.step {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.step.hidden {
+  display: none;
+}
+
+label {
+  display: block;
+  margin: 10px 0;
+}
+
+input[type="number"] {
+  margin-left: 8px;
+  width: 120px;
+  padding: 4px;
+}
+
+#stat-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#calibration-canvas-wrap {
+  margin: 12px 0;
+}
+
+#calibration-canvas {
+  max-width: 100%;
+  background: #000;
+  border: 1px solid #444;
+  cursor: crosshair;
+}
+
+.hint {
+  color: #999;
+  font-size: 13px;
+}
+
+#nav-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+button {
+  background: #226622;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:disabled {
+  background: #333;
+  color: #777;
+  cursor: not-allowed;
+}
+
+#review-summary {
+  background: #000;
+  padding: 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+#save-status {
+  font-size: 14px;
+}
+
+#save-status.ok {
+  color: #39ff14;
+}
+
+#save-status.error {
+  color: #ff5555;
+}

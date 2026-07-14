@@ -37,18 +37,32 @@ POLL_INTERVAL_SECONDS = 0.15
 WEBAPP_DIR_KEY = web.AppKey("webapp_dir", Path)
 SHOTS_LOG_PATH_KEY = web.AppKey("shots_log_path", str)
 MAT_STATE_PATH_KEY = web.AppKey("mat_state_path", str)
+CONFIG_FILE_PATH_KEY = web.AppKey("config_file_path", str)
+CALIBRATION_PATH_KEY = web.AppKey("calibration_path", str)
 WEBSOCKETS_KEY = web.AppKey("websockets", set)
 CONFIG_KEY = web.AppKey("config", dict)
 SHOTS_TASK_KEY = web.AppKey("shots_task", asyncio.Task)
 MAT_STATE_TASK_KEY = web.AppKey("mat_state_task", asyncio.Task)
 
 
-def build_config(mat_width_mm: float, mat_height_mm: float, canvas_width: int, canvas_height: int, calibration_path: str):
+def load_persisted_config(config_path: str) -> dict:
+    """Settings previously saved by the setup wizard (POST /api/setup), if any."""
+    if not config_path or not os.path.exists(config_path):
+        return {}
+    try:
+        with open(config_path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def build_config(mat_width_mm: float, mat_height_mm: float, canvas_width: int, canvas_height: int, calibration_path: str, stats=None):
     config = {
         "matWidthMm": mat_width_mm,
         "matHeightMm": mat_height_mm,
         "canvasWidth": canvas_width,
         "canvasHeight": canvas_height,
+        "stats": stats,
         "cssMatrix3d": None,
     }
     if calibration_path and os.path.exists(calibration_path):
@@ -64,6 +78,53 @@ async def handle_index(request: web.Request):
 
 async def handle_config(request: web.Request):
     return web.json_response(request.app[CONFIG_KEY])
+
+
+async def handle_setup(request: web.Request):
+    """Persist settings from the setup wizard (webapp/setup.html) and apply them immediately."""
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid JSON body"}, status=400)
+
+    mat_width_mm = payload.get("matWidthMm")
+    mat_height_mm = payload.get("matHeightMm")
+    if not (isinstance(mat_width_mm, (int, float)) and mat_width_mm > 0):
+        return web.json_response({"error": "matWidthMm must be a positive number"}, status=400)
+    if not (isinstance(mat_height_mm, (int, float)) and mat_height_mm > 0):
+        return web.json_response({"error": "matHeightMm must be a positive number"}, status=400)
+
+    current = request.app[CONFIG_KEY]
+    canvas_width = payload.get("canvasWidth") or current["canvasWidth"]
+    canvas_height = payload.get("canvasHeight") or current["canvasHeight"]
+    stats = payload.get("stats")
+    projector_corners = payload.get("projectorCorners")
+
+    persisted = {
+        "matWidthMm": mat_width_mm,
+        "matHeightMm": mat_height_mm,
+        "canvasWidth": canvas_width,
+        "canvasHeight": canvas_height,
+        "stats": stats,
+    }
+    with open(request.app[CONFIG_FILE_PATH_KEY], "w") as f:
+        json.dump(persisted, f, indent=2)
+
+    if projector_corners:
+        if len(projector_corners) != 4:
+            return web.json_response({"error": "projectorCorners must have exactly 4 points"}, status=400)
+        calibration = ProjectorCalibration(
+            canvas_size=(canvas_width, canvas_height),
+            projector_corners=[tuple(p) for p in projector_corners],
+        )
+        calibration.save(request.app[CALIBRATION_PATH_KEY])
+
+    new_config = build_config(
+        mat_width_mm, mat_height_mm, canvas_width, canvas_height, request.app[CALIBRATION_PATH_KEY], stats
+    )
+    request.app[CONFIG_KEY].clear()
+    request.app[CONFIG_KEY].update(new_config)
+    return web.json_response({"ok": True})
 
 
 async def handle_ws(request: web.Request):
@@ -156,16 +217,29 @@ def build_app(
     canvas_width: int,
     canvas_height: int,
     calibration_path: str,
+    config_file_path: str = "config.json",
 ) -> web.Application:
+    # Settings previously saved via the setup wizard override the CLI/default
+    # values, so restarting the bridge picks up whatever was last configured.
+    persisted = load_persisted_config(config_file_path)
+    mat_width_mm = persisted.get("matWidthMm", mat_width_mm)
+    mat_height_mm = persisted.get("matHeightMm", mat_height_mm)
+    canvas_width = persisted.get("canvasWidth", canvas_width)
+    canvas_height = persisted.get("canvasHeight", canvas_height)
+    stats = persisted.get("stats")
+
     app = web.Application()
     app[WEBAPP_DIR_KEY] = Path(webapp_dir)
     app[SHOTS_LOG_PATH_KEY] = shots_log_path
     app[MAT_STATE_PATH_KEY] = mat_state_path
+    app[CONFIG_FILE_PATH_KEY] = config_file_path
+    app[CALIBRATION_PATH_KEY] = calibration_path
     app[WEBSOCKETS_KEY] = set()
-    app[CONFIG_KEY] = build_config(mat_width_mm, mat_height_mm, canvas_width, canvas_height, calibration_path)
+    app[CONFIG_KEY] = build_config(mat_width_mm, mat_height_mm, canvas_width, canvas_height, calibration_path, stats)
 
     app.router.add_get("/", handle_index)
     app.router.add_get("/api/config", handle_config)
+    app.router.add_post("/api/setup", handle_setup)
     app.router.add_get("/ws", handle_ws)
     app.router.add_static("/", webapp_dir, name="static")
 
@@ -180,6 +254,7 @@ def main():
     parser.add_argument("--shots-log", default="shots_log.jsonl")
     parser.add_argument("--mat-state-file", default="mat_state.json")
     parser.add_argument("--projector-calibration", default="projector_calibration.json")
+    parser.add_argument("--config-file", default="config.json", help="Settings saved by the setup wizard (webapp/setup.html)")
     parser.add_argument("--mat-width-mm", type=float, default=1000.0)
     parser.add_argument("--mat-height-mm", type=float, default=1500.0)
     parser.add_argument("--canvas-width", type=int, default=1920)
@@ -197,6 +272,7 @@ def main():
         canvas_width=args.canvas_width,
         canvas_height=args.canvas_height,
         calibration_path=args.projector_calibration,
+        config_file_path=args.config_file,
     )
     web.run_app(app, host=args.host, port=args.port)
 

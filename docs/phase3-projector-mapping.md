@@ -27,18 +27,37 @@ homography, not just that it runs.
 
 ## One-time calibration (needs real projector + floor)
 
+**Recommended: the setup wizard's corner-pin step**
+(`webapp/setup.html`, step 3, see `docs/phase7-productization.md`).
+Drag each corner of an on-screen quad directly, while watching the
+actual floor projection, until it looks rectangular. This is
+mathematically the right approach with the least machinery: the corners
+you're dragging already live in canvas/output pixel space — the exact
+space `ProjectorCalibration.projector_corners` needs — so there's no
+intermediate coordinate system to get wrong. No camera required.
+
+**Alternative: `projector/calibration.py`'s CLI tool**, useful if you'd
+rather calibrate from a camera photo of the floor instead of standing at
+the kiosk PC dragging handles:
+
 ```bash
 python3 -m projector.calibration --canvas-width 1920 --canvas-height 1080 \
     --camera 0 --save projector_calibration.json
 ```
 
-Project a full-white test pattern (or just point the camera at the
-actual projected output), then click the 4 corners of the intended
-output area in the preview window, in order: top-left, top-right,
-bottom-right, bottom-left. This writes `projector_calibration.json`,
-which `bridge/server.py` picks up automatically and serves to the
-renderer as a `cssMatrix3d` string via `/api/config`.
+Project a full-white test pattern, then click the 4 corners of the
+intended output area in the preview window (top-left, top-right,
+bottom-right, bottom-left). Note this only produces a *correct* warp if
+that camera's own pixel space is itself known to correspond to real
+floor coordinates (e.g. the same ArUco-calibrated overhead tracking
+camera from Phase 2) — an arbitrary uncalibrated phone photo's pixel
+coordinates aren't guaranteed to relate to canvas/output space the way
+the corner-pin approach's coordinates are by construction. Prefer the
+wizard unless you specifically have a calibrated camera source.
 
-This step is inherently interactive and hardware-dependent (needs a
-display + a camera pointed at the real floor), so it isn't
-automated-tested — the pure homography/CSS math it depends on is.
+Either path writes `projector_calibration.json`, which `bridge/server.py`
+picks up automatically and serves to the renderer as a `cssMatrix3d`
+string via `/api/config`.
+
+Both are inherently interactive and hardware-dependent, so neither is
+automated-tested — the pure homography/CSS math they both depend on is.
