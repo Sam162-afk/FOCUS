@@ -157,7 +157,7 @@ def test_clubhead_approach_and_impact_marker_render_on_real_canvas(server_url, b
             const impactFrame = FocusClubhead.sampleClubheadFrame(state, 1);
             FocusRender.drawClubhead(ctx, canvas.width, canvas.height, state, impactFrame);
             const impactPos = FocusRender.shotPointToCanvas(impactFrame.position, canvas.width, canvas.height);
-            const markerX = impactPos.x + state.horizontalImpactNorm * 22;
+            const markerX = impactPos.x + state.horizontalImpactNorm * 34;
             const markerData = ctx.getImageData(Math.round(markerX), Math.round(impactPos.y), 1, 1).data;
 
             return { midHit, marker: [markerData[0], markerData[1], markerData[2]] };

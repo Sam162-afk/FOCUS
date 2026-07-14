@@ -112,6 +112,55 @@
   }
 
   /**
+   * Draw a stylized footprint outline at each tracked foot position, in
+   * addition to the straight alignment line. We only track each foot's
+   * center point (not its individual rotation - see vision/foot_detector.py),
+   * so each outline is drawn pointing perpendicular to the stance line,
+   * approximating a square stance rather than reflecting real per-foot flare.
+   */
+  function drawFootOutlines(ctx, width, height, footMatPoints, matSize, options) {
+    if (!footMatPoints) return;
+    const opts = Object.assign({ footLengthPx: 46, footWidthPx: 22 }, options || {});
+    const [left, right] = footMatPoints;
+
+    const toCanvas = (pt) => ({
+      x: (pt.x / matSize.widthMm) * width,
+      y: (pt.y / matSize.heightMm) * height,
+    });
+
+    const p1 = toCanvas(left);
+    const p2 = toCanvas(right);
+    // Note: under ctx.rotate(theta), local "+y" (the foot's toe direction
+    // in the path below) already ends up perpendicular to a rotate-by-theta
+    // reference direction - so using the stance line's own angle here
+    // (not stanceAngle + 90deg) is what makes the foot point across the
+    // stance line rather than lying flat along it.
+    const footAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+
+    const hw = opts.footWidthPx / 2;
+    const hl = opts.footLengthPx / 2;
+
+    [p1, p2].forEach((center) => {
+      ctx.save();
+      ctx.translate(center.x, center.y);
+      ctx.rotate(footAngle);
+      ctx.strokeStyle = COLORS.alignmentLine;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, hl);
+      ctx.quadraticCurveTo(hw * 1.3, hl * 0.5, hw, 0);
+      ctx.quadraticCurveTo(hw * 0.9, -hl * 0.6, hw * 0.55, -hl);
+      ctx.quadraticCurveTo(0, -hl * 1.15, -hw * 0.55, -hl);
+      ctx.quadraticCurveTo(-hw * 0.9, -hl * 0.6, -hw, 0);
+      ctx.quadraticCurveTo(-hw * 1.3, hl * 0.5, 0, hl);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  /**
    * Draw the clubhead as a thin wireframe outline (matching the alignment
    * line's line-art style, not a filled/solid shape) at its current
    * animated position and face angle. `clubheadState` is from
@@ -120,25 +169,39 @@
    * draws the toe/heel/high/low contact-point marker on the face.
    */
   function drawClubhead(ctx, width, height, clubheadState, frame, options) {
-    const opts = Object.assign({ faceHalfWidthPx: 32, bodyDepthPx: 24 }, options || {});
+    const opts = Object.assign({ faceHalfWidthPx: 34 }, options || {});
+    const fw = opts.faceHalfWidthPx;
     const pos = shotPointToCanvas(frame.position, width, height, options);
 
     ctx.save();
     ctx.translate(pos.x, pos.y);
     ctx.rotate((frame.faceAngleDeg * Math.PI) / 180);
 
+    // Asymmetric iron/wedge-head silhouette, viewed from above: a flat
+    // face with a slight bulge, a rounded toe, a shorter squared heel,
+    // and a hosel line - reads as "club" rather than a generic oval.
     ctx.strokeStyle = COLORS.shotPath;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    const heelBack = { x: -fw * 0.8, y: 4 };
     ctx.beginPath();
-    ctx.moveTo(-opts.faceHalfWidthPx, 0);
-    ctx.lineTo(opts.faceHalfWidthPx, 0);
-    ctx.quadraticCurveTo(0, opts.bodyDepthPx * 1.4, -opts.faceHalfWidthPx, 0);
+    ctx.moveTo(-fw, 0);
+    ctx.quadraticCurveTo(0, -3, fw, 0); // face, slight outward bulge
+    ctx.quadraticCurveTo(fw * 1.08, 10, fw * 0.85, 20); // rounded toe corner
+    ctx.lineTo(-fw * 0.55, 15); // topline, tapering toward the heel
+    ctx.lineTo(heelBack.x, heelBack.y); // heel back corner
     ctx.closePath();
     ctx.stroke();
 
-    if (frame.atImpact) {
-      const markerX = clubheadState.horizontalImpactNorm * opts.faceHalfWidthPx;
+    ctx.beginPath();
+    ctx.moveTo(heelBack.x, heelBack.y);
+    ctx.lineTo(-fw * 1.2, -fw * 0.53); // hosel, angled up and back from the heel
+    ctx.stroke();
+
+    if (frame.showImpactMarker) {
+      const markerX = clubheadState.horizontalImpactNorm * fw;
       ctx.fillStyle = COLORS.shotHead;
       ctx.beginPath();
       ctx.arc(markerX, 0, 4, 0, Math.PI * 2);
@@ -147,7 +210,7 @@
 
     ctx.restore();
 
-    if (frame.atImpact && clubheadState.label) {
+    if (frame.showImpactMarker && clubheadState.label) {
       ctx.fillStyle = COLORS.text;
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
@@ -172,6 +235,7 @@
     shotPointToCanvas,
     drawShotPath,
     drawAlignmentLine,
+    drawFootOutlines,
     drawClubhead,
     drawStatsOverlay,
   };

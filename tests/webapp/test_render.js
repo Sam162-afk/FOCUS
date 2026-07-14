@@ -164,3 +164,46 @@ test("drawClubhead draws no label text for a flush, centered strike", () => {
 
   assert.equal(ctx.calls.filter((c) => c[0] === "fillText").length, 0);
 });
+
+test("drawFootOutlines draws one stroked outline per foot", () => {
+  const ctx = makeMockCtx();
+  const matSize = { widthMm: 1000, heightMm: 1500 };
+  const feet = [{ x: 400, y: 750 }, { x: 600, y: 750 }];
+
+  FocusRender.drawFootOutlines(ctx, 800, 600, feet, matSize);
+
+  assert.equal(ctx.calls.filter((c) => c[0] === "stroke").length, 2);
+  assert.equal(ctx.calls.filter((c) => c[0] === "translate").length, 2);
+  const translates = ctx.calls.filter((c) => c[0] === "translate");
+  // Each outline is centered on its own foot's canvas position.
+  assert.equal(translates[0][1], (400 / 1000) * 800);
+  assert.equal(translates[1][1], (600 / 1000) * 800);
+});
+
+test("drawFootOutlines orients each foot's toe direction perpendicular to the stance line, not along it", () => {
+  // Regression test: the rotation angle was previously offset by an extra
+  // 90deg, which pointed the toe direction ALONG the stance line (feet
+  // lying on their side) instead of across it.
+  const ctx = makeMockCtx();
+  const matSize = { widthMm: 1000, heightMm: 1500 };
+  // A level (horizontal) stance line, canvas-space dy=0.
+  const feet = [{ x: 400, y: 750 }, { x: 600, y: 750 }];
+
+  FocusRender.drawFootOutlines(ctx, 800, 600, feet, matSize);
+
+  const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate");
+  assert.equal(rotateCalls.length, 2);
+  const stanceLineAngle = 0; // horizontal stance line -> atan2(0, dx) = 0
+  for (const call of rotateCalls) {
+    const footAngle = call[1];
+    // The bug produced footAngle = stanceLineAngle + PI/2; the fix keeps
+    // footAngle equal to the stance line's own angle.
+    assert.ok(Math.abs(footAngle - stanceLineAngle) < 1e-9, `expected footAngle ~= ${stanceLineAngle}, got ${footAngle}`);
+  }
+});
+
+test("drawFootOutlines does nothing when no feet are detected", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawFootOutlines(ctx, 800, 600, null, { widthMm: 1000, heightMm: 1500 });
+  assert.equal(ctx.calls.length, 0);
+});

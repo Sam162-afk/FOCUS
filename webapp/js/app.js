@@ -7,6 +7,7 @@
   "use strict";
 
   const APPROACH_DURATION_MS = 350; // clubhead swinging in and closing the face
+  const FOLLOW_THROUGH_DURATION_MS = 400; // clubhead continuing through, concurrent with ball flight
   const FLIGHT_DURATION_MS = 900; // ball-flight trace
 
   const canvas = document.getElementById("field");
@@ -68,13 +69,9 @@
 
     if (latestMatState && latestMatState.foot_mat_points_mm) {
       const [left, right] = latestMatState.foot_mat_points_mm;
-      FocusRender.drawAlignmentLine(
-        ctx,
-        canvas.width,
-        canvas.height,
-        [{ x: left[0], y: left[1] }, { x: right[0], y: right[1] }],
-        matSize
-      );
+      const feet = [{ x: left[0], y: left[1] }, { x: right[0], y: right[1] }];
+      FocusRender.drawAlignmentLine(ctx, canvas.width, canvas.height, feet, matSize);
+      FocusRender.drawFootOutlines(ctx, canvas.width, canvas.height, feet, matSize);
     }
 
     if (currentShot && animationStartMs !== null) {
@@ -85,11 +82,14 @@
         const frame = FocusClubhead.sampleClubheadFrame(currentClubheadState, approachProgress);
         FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, frame);
       } else {
-        const impactFrame = FocusClubhead.sampleClubheadFrame(currentClubheadState, 1);
-        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, impactFrame);
+        // Follow-through and ball flight happen concurrently, like a real
+        // swing: the ball's already gone while the golfer keeps swinging.
+        const postImpactElapsed = elapsed - APPROACH_DURATION_MS;
+        const followThroughProgress = Math.min(1, postImpactElapsed / FOLLOW_THROUGH_DURATION_MS);
+        const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
+        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame);
 
-        const flightElapsed = elapsed - APPROACH_DURATION_MS;
-        const rawProgress = Math.min(1, flightElapsed / FLIGHT_DURATION_MS);
+        const rawProgress = Math.min(1, postImpactElapsed / FLIGHT_DURATION_MS);
         const progress = FocusAnim.easeOutCubic(rawProgress);
         FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress);
         FocusRender.drawStatsOverlay(ctx, canvas.width, FocusStats.buildStatLines(currentShot, statIds));

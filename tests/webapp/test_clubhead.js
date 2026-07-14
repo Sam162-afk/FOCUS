@@ -108,3 +108,57 @@ test("horizontal impact takes label priority over vertical when both are large",
   const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6, VerticalFaceImpact: 0.4 }));
   assert.equal(state.label, "TOE STRIKE");
 });
+
+test("follow-through starts exactly at the impact point", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({ Path: 8 }));
+  const frame = FocusClubhead.sampleFollowThroughFrame(state, 0);
+  assert.deepEqual(frame.position, { x: 0, y: 0 });
+});
+
+test("follow-through continues downrange (positive y) past impact", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({}));
+  const frame = FocusClubhead.sampleFollowThroughFrame(state, 1);
+  assert.ok(frame.position.y > 0, "expected the follow-through to move in the downrange (+y) direction");
+});
+
+test("follow-through continues in the same lateral direction the approach was moving, not a mirror-image swing-back", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({ Path: 10 }));
+  // Approach for a positive path starts to the right (x>0) and moves toward x=0 at impact.
+  // Follow-through should continue that leftward-moving trend past impact (end up at x<0).
+  const end = FocusClubhead.sampleFollowThroughFrame(state, 1).position;
+  assert.ok(end.x < 0, `expected follow-through to continue past impact to the opposite side, got x=${end.x}`);
+});
+
+test("follow-through frames are never reported atImpact", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({}));
+  assert.equal(FocusClubhead.sampleFollowThroughFrame(state, 0).atImpact, false);
+  assert.equal(FocusClubhead.sampleFollowThroughFrame(state, 1).atImpact, false);
+});
+
+test("face angle continues rotating in the same direction through the follow-through", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({ FaceToTarget: -2, ClosureRate: 200 }));
+  // During approach the angle decreases toward faceToTarget (see the closure-rate test above).
+  const atImpact = FocusClubhead.sampleClubheadFrame(state, 1).faceAngleDeg;
+  const afterFollowThrough = FocusClubhead.sampleFollowThroughFrame(state, 1).faceAngleDeg;
+  assert.ok(afterFollowThrough < atImpact, "expected the face to keep closing (angle decreasing) past impact");
+});
+
+test("zero closure rate means the face angle holds steady through follow-through too", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({ FaceToTarget: 4, ClosureRate: 0 }));
+  const frame = FocusClubhead.sampleFollowThroughFrame(state, 1);
+  assert.equal(frame.faceAngleDeg, 4);
+});
+
+test("impact marker stays visible briefly into the follow-through, then hides", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6 }));
+  assert.equal(FocusClubhead.sampleFollowThroughFrame(state, 0).showImpactMarker, true);
+  assert.equal(FocusClubhead.sampleFollowThroughFrame(state, 0.1).showImpactMarker, true);
+  assert.equal(FocusClubhead.sampleFollowThroughFrame(state, 0.9).showImpactMarker, false);
+  assert.equal(FocusClubhead.sampleFollowThroughFrame(state, 1).showImpactMarker, false);
+});
+
+test("approach frames only show the impact marker at the very last frame", () => {
+  const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6 }));
+  assert.equal(FocusClubhead.sampleClubheadFrame(state, 0.5).showImpactMarker, false);
+  assert.equal(FocusClubhead.sampleClubheadFrame(state, 1).showImpactMarker, true);
+});

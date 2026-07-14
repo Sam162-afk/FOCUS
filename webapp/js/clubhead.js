@@ -28,6 +28,10 @@
     maxHorizontalImpactIn: 0.75, // +/- inches from center that maps to the full face-line half-width
     maxVerticalImpactIn: 0.5,
     labelThreshold: 0.4, // |normalized impact| above which we call out a toe/heel/high/low strike
+    followThroughDurationSec: 0.4, // stylization only - how long the visual follow-through takes
+    followThroughDistanceNorm: 0.24, // how far past impact the clubhead swings through, in normalized units
+    followThroughClosureFrac: 0.35, // fraction of the approach's closure that continues past impact
+    impactMarkerHoldFrac: 0.3, // fraction of the follow-through the impact-point marker/label stays visible for
   };
 
   function clamp(v, lo, hi) {
@@ -80,11 +84,26 @@
       label = verticalImpactNorm > 0 ? "HIGH FACE" : "LOW FACE";
     }
 
+    // Follow-through: the club doesn't stop at impact - it continues
+    // through along roughly the same line of travel (start -> impact,
+    // extrapolated past impact), and the face keeps rotating briefly in
+    // the same direction it was closing, just decelerating.
+    const followThroughScale = opts.followThroughDistanceNorm / opts.approachDistanceNorm;
+    const followThroughEnd = {
+      x: -start.x * followThroughScale,
+      y: opts.followThroughDistanceNorm,
+    };
+    const followThroughFaceAngleDeg =
+      faceToTarget - closureRate * opts.followThroughDurationSec * opts.followThroughClosureFrac;
+
     return {
       start,
       impact,
+      followThroughEnd,
+      impactMarkerHoldFrac: opts.impactMarkerHoldFrac,
       startFaceAngleDeg,
       faceToTarget,
+      followThroughFaceAngleDeg,
       closureRate,
       horizontalImpactNorm,
       verticalImpactNorm,
@@ -98,10 +117,29 @@
    */
   function sampleClubheadFrame(state, progress) {
     const t = clamp(progress, 0, 1);
+    const atImpact = t >= 1;
     return {
       position: lerpPoint(state.start, state.impact, t),
       faceAngleDeg: lerp(state.startFaceAngleDeg, state.faceToTarget, t),
-      atImpact: t >= 1,
+      atImpact,
+      showImpactMarker: atImpact,
+    };
+  }
+
+  /**
+   * Sample the clubhead's position and face angle at a point in the
+   * follow-through (progress 0 = right at impact, 1 = end of the visual
+   * follow-through arc). The impact-point marker/label stay visible for
+   * the first `impactMarkerHoldFrac` of the follow-through so they're
+   * actually legible, rather than flashing for a single frame at impact.
+   */
+  function sampleFollowThroughFrame(state, progress) {
+    const t = clamp(progress, 0, 1);
+    return {
+      position: lerpPoint(state.impact, state.followThroughEnd, t),
+      faceAngleDeg: lerp(state.faceToTarget, state.followThroughFaceAngleDeg, t),
+      atImpact: false,
+      showImpactMarker: t < state.impactMarkerHoldFrac,
     };
   }
 
@@ -109,5 +147,6 @@
     DEFAULTS,
     computeClubheadState,
     sampleClubheadFrame,
+    sampleFollowThroughFrame,
   };
 });
