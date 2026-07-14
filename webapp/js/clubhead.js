@@ -21,8 +21,8 @@
   "use strict";
 
   const DEFAULTS = {
-    approachDurationSec: 0.35, // stylization only - how long the visual approach takes
-    approachDistanceNorm: 0.18, // how far "behind" the ball the clubhead starts, in normalized units
+    approachDurationSec: 0.65, // stylization only - how long the visual approach takes
+    approachDistanceNorm: 0.32, // how far "behind" the ball the clubhead starts, in normalized units
     maxPathDeg: 15, // club path magnitude that maps to full lateral approach-line offset
     maxApproachLateralFrac: 0.35,
     maxHorizontalImpactIn: 0.75, // +/- inches from center that maps to the full face-line half-width
@@ -123,6 +123,7 @@
       faceAngleDeg: lerp(state.startFaceAngleDeg, state.faceToTarget, t),
       atImpact,
       showImpactMarker: atImpact,
+      inApproach: true,
     };
   }
 
@@ -140,6 +141,7 @@
       faceAngleDeg: lerp(state.faceToTarget, state.followThroughFaceAngleDeg, t),
       atImpact: false,
       showImpactMarker: t < state.impactMarkerHoldFrac,
+      inApproach: false,
     };
   }
 

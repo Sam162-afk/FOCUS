@@ -29,6 +29,10 @@ function makeMockCtx() {
     set font(v) {},
     set textAlign(v) {},
     set textBaseline(v) {},
+    set letterSpacing(v) {},
+    set shadowColor(v) {},
+    set shadowBlur(v) {},
+    set globalAlpha(v) {},
   };
 }
 
@@ -37,7 +41,7 @@ test("shotPointToCanvas maps impact point (0,0) to bottom-center minus margin", 
   const height = 600;
   const pt = FocusRender.shotPointToCanvas({ x: 0, y: 0 }, width, height);
   assert.equal(pt.x, width / 2);
-  assert.equal(pt.y, height - 200); // default bottomMarginPx
+  assert.equal(pt.y, height - 260); // default bottomMarginPx
 });
 
 test("shotPointToCanvas maps positive x to the right half of the canvas", () => {
@@ -118,11 +122,17 @@ test("drawAlignmentLine does nothing when no feet are detected", () => {
   assert.equal(ctx.calls.length, 0);
 });
 
-test("drawStatsOverlay writes one fillText call per stat line", () => {
+test("drawStatsOverlay writes a label and a value fillText call per stat line", () => {
   const ctx = makeMockCtx();
   FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Smash Factor: 1.48"]);
   const textCalls = ctx.calls.filter((c) => c[0] === "fillText");
-  assert.equal(textCalls.length, 2);
+  assert.equal(textCalls.length, 4); // label + value, per stat
+
+  const texts = textCalls.map((c) => c[1]);
+  assert.ok(texts.includes("CLUB PATH"));
+  assert.ok(texts.includes("2.1"));
+  assert.ok(texts.includes("SMASH FACTOR"));
+  assert.ok(texts.includes("1.48"));
 });
 
 test("drawClubhead strokes a wireframe outline (no fill) at every frame", () => {

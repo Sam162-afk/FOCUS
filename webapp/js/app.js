@@ -6,7 +6,7 @@
 (function () {
   "use strict";
 
-  const APPROACH_DURATION_MS = 350; // clubhead swinging in and closing the face
+  const APPROACH_DURATION_MS = 650; // clubhead swinging in and closing the face
   const FOLLOW_THROUGH_DURATION_MS = 400; // clubhead continuing through, concurrent with ball flight
   const FLIGHT_DURATION_MS = 900; // ball-flight trace
 
@@ -74,6 +74,10 @@
       FocusRender.drawFootOutlines(ctx, canvas.width, canvas.height, feet, matSize);
     }
 
+    if (currentShot) {
+      FocusRender.drawDistanceGuides(ctx, canvas.width, canvas.height);
+    }
+
     if (currentShot && animationStartMs !== null) {
       const elapsed = nowMs - animationStartMs;
 
@@ -91,7 +95,9 @@
 
         const rawProgress = Math.min(1, postImpactElapsed / FLIGHT_DURATION_MS);
         const progress = FocusAnim.easeOutCubic(rawProgress);
-        FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress);
+        const carry = currentShot.BallData && currentShot.BallData.CarryDistance;
+        const landingLabel = typeof carry === "number" ? `${Math.round(carry)} YDS` : null;
+        FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress, { landingLabel });
         FocusRender.drawStatsOverlay(ctx, canvas.width, FocusStats.buildStatLines(currentShot, statIds));
       }
     }

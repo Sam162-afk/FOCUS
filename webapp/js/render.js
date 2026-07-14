@@ -15,10 +15,13 @@
 
   const COLORS = {
     background: "#000000",
-    alignmentLine: "#39ff14", // lime
-    shotPath: "#ffffff",
-    shotHead: "#ffff00", // yellow
-    text: "#ffffff",
+    alignmentLine: "#4ade80", // refined spring green, not traffic-cone lime
+    shotPath: "#f5f2ea", // warm off-white, not flat #fff
+    shotHead: "#ffb020", // warm amber, not pure yellow
+    text: "#f5f2ea",
+    textDim: "#9a9d8f",
+    gridLine: "rgba(74, 222, 128, 0.14)",
+    gridLabel: "rgba(154, 157, 143, 0.65)",
   };
 
   function clearCanvas(ctx, width, height) {
@@ -39,7 +42,7 @@
    */
   function shotPointToCanvas(pt, width, height, options) {
     const opts = Object.assign(
-      { topMarginPx: 40, bottomMarginPx: 200, xRangeFrac: 0.42, belowOriginPxPerUnit: 700 },
+      { topMarginPx: 40, bottomMarginPx: 260, xRangeFrac: 0.42, belowOriginPxPerUnit: 700 },
       options || {}
     );
     const cx = width / 2;
@@ -54,11 +57,37 @@
     };
   }
 
+  /**
+   * Faint yardage guide-lines behind the shot trace, so a curving line has
+   * some sense of scale instead of floating in an empty void. Starts past
+   * the impact zone (not at 0) to avoid clutter around the feet/clubhead.
+   */
+  function drawDistanceGuides(ctx, width, height, options) {
+    const opts = Object.assign({ maxCarryYds: 300, intervalYds: 50, startYds: 100 }, options || {});
+    ctx.strokeStyle = COLORS.gridLine;
+    ctx.lineWidth = 1;
+    ctx.font = "12px ui-monospace, 'SF Mono', Consolas, monospace";
+    ctx.fillStyle = COLORS.gridLabel;
+    ctx.textAlign = "right"; // right edge - the stat overlay lives in the top-left
+    ctx.textBaseline = "middle";
+    for (let yds = opts.startYds; yds < opts.maxCarryYds; yds += opts.intervalYds) {
+      const pt = shotPointToCanvas({ x: 0, y: yds / opts.maxCarryYds }, width, height, options);
+      ctx.beginPath();
+      ctx.moveTo(0, pt.y);
+      ctx.lineTo(width, pt.y);
+      ctx.stroke();
+      ctx.fillText(`${yds}`, width - 16, pt.y - 10);
+    }
+  }
+
   function drawShotPath(ctx, width, height, pathPoints, progress, options) {
     const revealCount = Math.max(1, Math.round(pathPoints.length * progress));
     const visible = pathPoints.slice(0, revealCount);
     if (visible.length < 2) return;
 
+    ctx.save();
+    ctx.shadowColor = COLORS.shotPath;
+    ctx.shadowBlur = 14;
     ctx.strokeStyle = COLORS.shotPath;
     ctx.lineWidth = 4;
     ctx.lineJoin = "round";
@@ -70,12 +99,25 @@
       else ctx.lineTo(canvasPt.x, canvasPt.y);
     });
     ctx.stroke();
+    ctx.restore();
 
     const head = shotPointToCanvas(visible[visible.length - 1], width, height, options);
+    ctx.save();
+    ctx.shadowColor = COLORS.shotHead;
+    ctx.shadowBlur = 18;
     ctx.fillStyle = COLORS.shotHead;
     ctx.beginPath();
     ctx.arc(head.x, head.y, 7, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+
+    if (progress >= 1 && options && options.landingLabel) {
+      ctx.fillStyle = COLORS.shotHead;
+      ctx.font = "700 20px ui-monospace, 'SF Mono', Consolas, monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(options.landingLabel, head.x + 14, head.y);
+    }
   }
 
   /**
@@ -173,6 +215,19 @@
     const fw = opts.faceHalfWidthPx;
     const pos = shotPointToCanvas(frame.position, width, height, options);
 
+    if (frame.inApproach && !frame.atImpact) {
+      const startPos = shotPointToCanvas(clubheadState.start, width, height, options);
+      ctx.save();
+      ctx.globalAlpha = 0.28;
+      ctx.strokeStyle = COLORS.shotPath;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(startPos.x, startPos.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(pos.x, pos.y);
     ctx.rotate((frame.faceAngleDeg * Math.PI) / 180);
@@ -211,21 +266,43 @@
     ctx.restore();
 
     if (frame.showImpactMarker && clubheadState.label) {
-      ctx.fillStyle = COLORS.text;
-      ctx.font = "bold 16px sans-serif";
+      ctx.fillStyle = COLORS.shotHead;
+      ctx.font = "700 15px ui-sans-serif, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
+      ctx.letterSpacing = "2px";
       ctx.fillText(clubheadState.label, pos.x, pos.y - opts.faceHalfWidthPx - 6);
+      ctx.letterSpacing = "0px";
     }
   }
 
+  /**
+   * Stat overlay with real typographic hierarchy: a small letter-spaced
+   * uppercase label over a large tabular-numeral value, rather than a flat
+   * "Label: value" line. `stats` is the array of "Label: value" strings
+   * from stat-catalog.js's buildStatLines().
+   */
   function drawStatsOverlay(ctx, width, stats) {
-    ctx.fillStyle = COLORS.text;
-    ctx.font = "bold 34px sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    stats.forEach((line, i) => {
-      ctx.fillText(line, 24, 24 + i * 44);
+    const startX = 28;
+    let y = 26;
+    stats.forEach((line) => {
+      const separatorIndex = line.indexOf(": ");
+      const label = separatorIndex === -1 ? line : line.slice(0, separatorIndex);
+      const value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 2);
+
+      ctx.fillStyle = COLORS.textDim;
+      ctx.font = "600 13px ui-sans-serif, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.letterSpacing = "2px";
+      ctx.fillText(label.toUpperCase(), startX, y);
+      ctx.letterSpacing = "0px";
+
+      ctx.fillStyle = COLORS.text;
+      ctx.font = "700 32px ui-monospace, 'SF Mono', Consolas, monospace";
+      ctx.fillText(value, startX, y + 16);
+
+      y += 66;
     });
   }
 
@@ -233,6 +310,7 @@
     COLORS,
     clearCanvas,
     shotPointToCanvas,
+    drawDistanceGuides,
     drawShotPath,
     drawAlignmentLine,
     drawFootOutlines,
