@@ -368,11 +368,53 @@
   // matching a real projected display, where the numbers lie directly on
   // the turf around the ball at varying angles, not stacked in a uniform
   // list. Cycles if there are more stats than slots.
+  // Matches the default stat order (carry, ball speed, side spin, back
+  // spin) - side spin sits closest to the ball (where a launch monitor
+  // sensor would sit), carry/ball speed fan out further right, back spin
+  // lands lower and closer to horizontal.
   const STAT_LAYOUT = [
-    { dx: 60, dy: -190, rotationDeg: -13 },
-    { dx: 190, dy: -250, rotationDeg: -9 },
-    { dx: 150, dy: -60, rotationDeg: 5 },
+    { dx: 190, dy: -180, rotationDeg: -13 },
+    { dx: 260, dy: -260, rotationDeg: -9 },
+    { dx: 20, dy: -110, rotationDeg: -18 },
+    { dx: 210, dy: -40, rotationDeg: 5 },
   ];
+
+  /**
+   * Small spin-axis dial beside the ball - a best-effort guess at the
+   * circular readout seen next to the ball in a real projected display's
+   * reference photo (exact pixels of that graphic aren't precisely known,
+   * so this is an approximation, not a measured recreation). Ties it to
+   * real data rather than pure decoration: the tick shows the spin axis
+   * direction (which way the shot curves), reusing the same
+   * BallData.SpinAxis the side/back spin stats are decomposed from.
+   */
+  function drawSpinDial(ctx, width, height, origin, spinAxisDeg, options) {
+    if (!origin || typeof spinAxisDeg !== "number") return;
+    const opts = Object.assign({ dx: -50, dy: -70, radius: 20 }, options || {});
+    const cx = origin.x + opts.dx;
+    const cy = origin.y + opts.dy;
+
+    ctx.save();
+    ctx.strokeStyle = COLORS.textDim;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = COLORS.text;
+    ctx.shadowBlur = 4;
+    ctx.setLineDash([2, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, opts.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 0deg axis points toward the target (up); positive axis curves right.
+    const angleRad = (-90 + spinAxisDeg) * (Math.PI / 180);
+    ctx.strokeStyle = COLORS.text;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angleRad) * opts.radius, cy + Math.sin(angleRad) * opts.radius);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   /**
    * Stat overlay: plain glowing text (no boxes/borders) scattered around
@@ -432,6 +474,7 @@
     drawAlignmentLine,
     drawFootOutlines,
     drawClubhead,
+    drawSpinDial,
     drawStatsOverlay,
   };
 });

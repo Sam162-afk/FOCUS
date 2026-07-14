@@ -352,3 +352,19 @@ test("drawStatsOverlay falls back to a plain unrotated vertical list when no ori
   assert.equal(translateCalls[0][2], 24);
   assert.ok(translateCalls[1][2] > translateCalls[0][2], "expected the second stat further down the fallback list");
 });
+
+test("drawSpinDial does nothing without an origin or a numeric spin axis", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawSpinDial(ctx, 800, 600, null, 15);
+  FocusRender.drawSpinDial(ctx, 800, 600, { x: 100, y: 100 }, null);
+  assert.equal(ctx.calls.length, 0);
+});
+
+test("drawSpinDial draws a circle and a direction tick near the given origin", () => {
+  const ctx = makeMockCtx();
+  const origin = { x: 500, y: 400 };
+  FocusRender.drawSpinDial(ctx, 800, 600, origin, 15);
+  assert.ok(ctx.calls.some((c) => c[0] === "arc"), "expected a circular dial outline");
+  const lineTo = ctx.calls.filter((c) => c[0] === "lineTo");
+  assert.ok(lineTo.length >= 1, "expected a direction tick line");
+});

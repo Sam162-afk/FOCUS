@@ -11,8 +11,19 @@ test("formatStatLine formats a simple numeric path stat", () => {
   assert.equal(FocusStats.formatStatLine(SAMPLE_SHOT, "clubPath"), "Club Path: -2.1°");
 });
 
-test("formatStatLine formats carry distance with no decimals and yds unit", () => {
-  assert.equal(FocusStats.formatStatLine(SAMPLE_SHOT, "carryDistance"), "Carry Distance: 221 yds");
+test("formatStatLine formats carry distance with the unit folded into the label, not the value", () => {
+  // Matches a real projected display: the big glowing number is just the
+  // digits ("141.5"), the unit lives in the small label beside it.
+  assert.equal(FocusStats.formatStatLine(SAMPLE_SHOT, "carryDistance"), "Carry (yd): 220.5");
+});
+
+test("formatStatLine decomposes side spin and back spin from total spin + spin axis", () => {
+  const totalSpin = 4200;
+  const spinAxis = -4.7;
+  const expectedSide = (totalSpin * Math.sin((spinAxis * Math.PI) / 180)).toFixed(0);
+  const expectedBack = (totalSpin * Math.cos((spinAxis * Math.PI) / 180)).toFixed(0);
+  assert.equal(FocusStats.formatStatLine(SAMPLE_SHOT, "sideSpin"), `Side Spin (rpm): ${expectedSide}`);
+  assert.equal(FocusStats.formatStatLine(SAMPLE_SHOT, "backSpin"), `Back Spin (rpm): ${expectedBack}`);
 });
 
 test("formatStatLine special-cases smash factor (not a direct path)", () => {
@@ -42,5 +53,5 @@ test("buildStatLines caps at MAX_STATS even if more ids are requested", () => {
 test("buildStatLines respects a custom order and skips unavailable stats", () => {
   const shot = { BallData: { Speed: 148.5 }, ClubData: {} }; // no club Path/FaceToTarget/Speed
   const lines = FocusStats.buildStatLines(shot, ["clubPath", "ballSpeed"]);
-  assert.deepEqual(lines, ["Ball Speed: 148.5 mph"]);
+  assert.deepEqual(lines, ["Ball Speed (mph): 148.5"]);
 });

@@ -67,27 +67,31 @@
   function renderFrame(nowMs) {
     FocusRender.clearCanvas(ctx, canvas.width, canvas.height);
 
-    // Anchor the whole shot-space animation (target line, clubhead, ball
-    // flight, stat boxes) beside the golfer's actual tracked ball position,
-    // instead of a fixed canvas point unrelated to where they're standing.
+    // Anchor the whole shot-space animation (clubhead, ball flight, stats)
+    // beside the golfer's actual tracked ball position, instead of a fixed
+    // canvas point unrelated to where they're standing.
     let originPx = null;
+    const preShot = !currentShot;
 
     if (latestMatState && latestMatState.foot_mat_points_mm) {
       const [left, right] = latestMatState.foot_mat_points_mm;
       const feet = [{ x: left[0], y: left[1] }, { x: right[0], y: right[1] }];
-      FocusRender.drawAlignmentLine(ctx, canvas.width, canvas.height, feet, matSize);
-      FocusRender.drawFootOutlines(ctx, canvas.width, canvas.height, feet, matSize);
+
+      // The stance/alignment reference is only useful while addressing the
+      // ball - once a shot is struck, showing it (along with the target
+      // line and distance gridlines) just clutters the results, unlike a
+      // real projected display, which shows nothing but the ball's own
+      // numbers once the swing is done.
+      if (preShot) {
+        FocusRender.drawAlignmentLine(ctx, canvas.width, canvas.height, feet, matSize);
+        FocusRender.drawFootOutlines(ctx, canvas.width, canvas.height, feet, matSize);
+      }
 
       const ballMatPosition = FocusRender.computeBallMatPosition(feet);
       originPx = FocusRender.matPointToCanvas(ballMatPosition, canvas.width, canvas.height, matSize);
     }
 
     const shotOptions = originPx ? { originPx } : undefined;
-
-    if (currentShot) {
-      FocusRender.drawDistanceGuides(ctx, canvas.width, canvas.height, shotOptions);
-      FocusRender.drawTargetLine(ctx, canvas.width, canvas.height, shotOptions);
-    }
 
     if (currentShot && animationStartMs !== null) {
       const elapsed = nowMs - animationStartMs;
@@ -99,16 +103,23 @@
       } else {
         // Follow-through and ball flight happen concurrently, like a real
         // swing: the ball's already gone while the golfer keeps swinging.
+        // The clubhead graphic itself stops once the follow-through
+        // settles - a real club would have long since left the frame, and
+        // lingering the synthetic silhouette on screen just clutters the
+        // results the way the real reference display never does.
         const postImpactElapsed = elapsed - APPROACH_DURATION_MS;
         const followThroughProgress = Math.min(1, postImpactElapsed / FOLLOW_THROUGH_DURATION_MS);
-        const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
-        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame, shotOptions);
+        if (followThroughProgress < 1) {
+          const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
+          FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame, shotOptions);
+        }
 
         const rawProgress = Math.min(1, postImpactElapsed / FLIGHT_DURATION_MS);
         const progress = FocusAnim.easeOutCubic(rawProgress);
         const carry = currentShot.BallData && currentShot.BallData.CarryDistance;
         const landingLabel = typeof carry === "number" ? `${Math.round(carry)} YDS` : null;
         FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress, Object.assign({}, shotOptions, { landingLabel }));
+        FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, originPx, currentShot.BallData && currentShot.BallData.SpinAxis);
         FocusRender.drawStatsOverlay(
           ctx,
           canvas.width,

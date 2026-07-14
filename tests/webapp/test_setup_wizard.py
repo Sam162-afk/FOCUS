@@ -35,7 +35,7 @@ def browser():
         b.close()
 
 
-def test_stat_picker_enforces_max_of_three(server_url, browser):
+def test_stat_picker_enforces_max_of_four(server_url, browser):
     page = browser.new_page()
     page.goto(f"{server_url}/setup.html")
 
@@ -43,19 +43,19 @@ def test_stat_picker_enforces_max_of_three(server_url, browser):
     checkboxes = page.query_selector_all("#stat-options input[type=checkbox]")
     assert len(checkboxes) >= 5
 
-    # Uncheck the 3 that are pre-selected by default, then check 4 different ones.
+    # Uncheck the 4 that are pre-selected by default, then check 5 different ones.
     for cb in checkboxes:
         if cb.is_checked():
             cb.click()
 
-    for cb in checkboxes[:4]:
+    for cb in checkboxes[:5]:
         cb.click()
 
     checked = [cb for cb in checkboxes if cb.is_checked()]
-    assert len(checked) == 3, "expected the 4th checkbox click to be rejected by the max-3 rule"
+    assert len(checked) == 4, "expected the 5th checkbox click to be rejected by the max-4 rule"
 
     selected = page.evaluate("window.__focusWizardDebug.getSelectedStats()")
-    assert len(selected) == 3
+    assert len(selected) == 4
     page.close()
 
 
@@ -121,7 +121,7 @@ def test_review_step_shows_current_selections(server_url, browser):
     summary = json.loads(summary_text)
     assert summary["matWidthMm"] == 1200
     assert summary["matHeightMm"] == 1800
-    assert len(summary["stats"]) <= 3
+    assert len(summary["stats"]) <= 4
     page.close()
 
 
