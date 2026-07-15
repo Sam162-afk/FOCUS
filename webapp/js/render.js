@@ -24,6 +24,7 @@
     gridLabel: "rgba(154, 157, 143, 0.65)",
     targetLine: "rgba(245, 242, 234, 0.32)", // neutral dashed reference, distinct from the tracked stance line
     faceLine: "rgba(255, 176, 32, 0.55)", // dashed amber - ties to the impact-derived data family
+    boxBorder: "rgba(245, 242, 234, 0.35)",
   };
 
   function clearCanvas(ctx, width, height) {
@@ -91,7 +92,9 @@
    * The fixed, ideal aim line (straight toward the target, independent of
    * any particular shot or the golfer's actual stance) - a dashed neutral
    * reference distinct from both the tracked stance line (green, real) and
-   * the shot trace (white, outcome).
+   * the shot trace (white, outcome). Passes straight through the ball in
+   * both directions (toward the target, and back behind the ball toward
+   * the golfer), not just a ray pointing away from it.
    */
   function drawTargetLine(ctx, width, height, options) {
     const origin = shotPointToCanvas({ x: 0, y: 0 }, width, height, options);
@@ -100,8 +103,8 @@
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 7]);
     ctx.beginPath();
-    ctx.moveTo(origin.x, origin.y);
-    ctx.lineTo(origin.x, 0);
+    ctx.moveTo(origin.x, 0);
+    ctx.lineTo(origin.x, height);
     ctx.stroke();
     ctx.restore();
   }
@@ -162,6 +165,28 @@
   }
 
   /**
+   * Shift both tracked foot points perpendicular to the stance line, by
+   * `offsetMm` in the direction `side` picks (+1/-1 - a physical-setup
+   * detail, same ambiguity as computeBallMatPosition's `side`, fixed at
+   * calibration time). Shared by the ball-position offset (large, ~club
+   * length) and the toe-line offset (small, ~half a foot length) below.
+   */
+  function offsetAcrossStance(footMatPoints, offsetMm, side) {
+    const [left, right] = footMatPoints;
+    const dx = right.x - left.x;
+    const dy = right.y - left.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const stanceUx = dx / len;
+    const stanceUy = dy / len;
+    const perpUx = -stanceUy * side;
+    const perpUy = stanceUx * side;
+    return [
+      { x: left.x + perpUx * offsetMm, y: left.y + perpUy * offsetMm },
+      { x: right.x + perpUx * offsetMm, y: right.y + perpUy * offsetMm },
+    ];
+  }
+
+  /**
    * A golfer doesn't stand over the ball - at address the ball sits out in
    * front of their toes, roughly a club-length away, not between/under the
    * feet. Real-world reference (address-position measurements): stance is
@@ -181,22 +206,19 @@
   function computeBallMatPosition(footMatPoints, options) {
     const opts = Object.assign({ perpendicularOffsetMm: 600, forwardOffsetMm: 0, side: 1 }, options || {});
     const [left, right] = footMatPoints;
-    const midX = (left.x + right.x) / 2;
-    const midY = (left.y + right.y) / 2;
-
     const dx = right.x - left.x;
     const dy = right.y - left.y;
     const len = Math.hypot(dx, dy) || 1;
     const stanceUx = dx / len;
     const stanceUy = dy / len;
-    // Rotate the stance-line direction 90deg to get the direction across
-    // it, toward the ball.
-    const perpUx = -stanceUy * opts.side;
-    const perpUy = stanceUx * opts.side;
+
+    const [shiftedLeft, shiftedRight] = offsetAcrossStance(footMatPoints, opts.perpendicularOffsetMm, opts.side);
+    const shiftedMidX = (shiftedLeft.x + shiftedRight.x) / 2;
+    const shiftedMidY = (shiftedLeft.y + shiftedRight.y) / 2;
 
     return {
-      x: midX + perpUx * opts.perpendicularOffsetMm + stanceUx * opts.forwardOffsetMm,
-      y: midY + perpUy * opts.perpendicularOffsetMm + stanceUy * opts.forwardOffsetMm,
+      x: shiftedMidX + stanceUx * opts.forwardOffsetMm,
+      y: shiftedMidY + stanceUy * opts.forwardOffsetMm,
     };
   }
 
@@ -204,11 +226,16 @@
    * Draw the real, camera-tracked stance/alignment line. `footMatPoints`
    * is a pair of {x, y} points in mat-space millimeters; `matSize` is
    * {widthMm, heightMm}. Drawn as a full-width line through the two feet,
-   * extended to the canvas edges so it reads as an aim reference.
+   * extended to the canvas edges so it reads as an aim reference. Offset
+   * toward the ball side by `toeOffsetMm` (default ~130mm, roughly half a
+   * shoe length) so the line reads as running along the toes - the real
+   * alignment reference golfers use - rather than through the tracked
+   * center of each foot.
    */
-  function drawAlignmentLine(ctx, width, height, footMatPoints, matSize) {
+  function drawAlignmentLine(ctx, width, height, footMatPoints, matSize, options) {
     if (!footMatPoints) return;
-    const [left, right] = footMatPoints;
+    const opts = Object.assign({ toeOffsetMm: 130, side: 1 }, options || {});
+    const [left, right] = offsetAcrossStance(footMatPoints, opts.toeOffsetMm, opts.side);
 
     const p1 = matPointToCanvas(left, width, height, matSize);
     const p2 = matPointToCanvas(right, width, height, matSize);
@@ -364,21 +391,6 @@
     }
   }
 
-  // Where each stat lands relative to the ball origin, and at what angle -
-  // matching a real projected display, where the numbers lie directly on
-  // the turf around the ball at varying angles, not stacked in a uniform
-  // list. Cycles if there are more stats than slots.
-  // Matches the default stat order (carry, ball speed, side spin, back
-  // spin) - side spin sits closest to the ball (where a launch monitor
-  // sensor would sit), carry/ball speed fan out further right, back spin
-  // lands lower and closer to horizontal.
-  const STAT_LAYOUT = [
-    { dx: 190, dy: -180, rotationDeg: -13 },
-    { dx: 260, dy: -260, rotationDeg: -9 },
-    { dx: 20, dy: -110, rotationDeg: -18 },
-    { dx: 210, dy: -40, rotationDeg: 5 },
-  ];
-
   /**
    * Small spin-axis dial beside the ball - a best-effort guess at the
    * circular readout seen next to the ball in a real projected display's
@@ -417,49 +429,94 @@
   }
 
   /**
-   * Stat overlay: plain glowing text (no boxes/borders) scattered around
-   * the ball position at varying rotation angles, the way a real floor
-   * projector's numbers read as if lying flat on the turf next to the
-   * ball rather than a list pinned to a screen corner. `stats` is the
-   * array of "Label: value" strings from stat-catalog.js's
-   * buildStatLines(). Falls back to a plain vertical list at a fixed
-   * position (no rotation) when no `options.origin` (ball canvas point)
-   * is tracked yet.
+   * Stat overlay: bordered boxes in a single row, each with a small label
+   * and a big value - like a real launch-monitor readout strip. The whole
+   * row is rotated 90deg around the ball position so it reads right-side
+   * up for the golfer standing at address (to the side of the ball, along
+   * the stance line) rather than for a bird's-eye viewer looking from
+   * behind the ball toward the target. `stats` is the array of
+   * "Label: value" strings from stat-catalog.js's buildStatLines().
+   * Falls back to a plain unrotated vertical list at a fixed position
+   * when no `options.origin` (ball canvas point) is tracked yet.
    */
   function drawStatsOverlay(ctx, width, stats, options) {
-    const opts = Object.assign({ origin: null, startX: 24, startY: 24, lineHeight: 70, layout: STAT_LAYOUT }, options || {});
+    const opts = Object.assign(
+      {
+        origin: null,
+        startX: 24,
+        startY: 24,
+        lineHeight: 70,
+        boxWidth: 150,
+        boxHeight: 110,
+        gap: 10,
+        offsetX: 70,
+        offsetY: -20,
+        rotationDeg: 90,
+      },
+      options || {}
+    );
 
-    stats.forEach((line, i) => {
+    if (!opts.origin) {
+      // No ball position tracked yet - fall back to a plain, unrotated
+      // vertical list at a fixed corner.
+      let y = opts.startY;
+      stats.forEach((line) => {
+        const separatorIndex = line.indexOf(": ");
+        const label = separatorIndex === -1 ? line : line.slice(0, separatorIndex);
+        const value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 2);
+        ctx.save();
+        ctx.translate(opts.startX, y);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = COLORS.textDim;
+        ctx.font = "700 13px ui-sans-serif, sans-serif";
+        ctx.letterSpacing = "1.5px";
+        ctx.fillText(label.toUpperCase(), 0, 0);
+        ctx.letterSpacing = "0px";
+        ctx.fillStyle = COLORS.text;
+        ctx.font = "800 28px ui-sans-serif, sans-serif";
+        ctx.fillText(value, 0, 28);
+        ctx.restore();
+        y += opts.lineHeight;
+      });
+      return;
+    }
+
+    const n = stats.length;
+    const totalWidth = n * opts.boxWidth + Math.max(0, n - 1) * opts.gap;
+    const rotationRad = (opts.rotationDeg * Math.PI) / 180;
+
+    ctx.save();
+    ctx.translate(opts.origin.x + opts.offsetX, opts.origin.y + opts.offsetY);
+    ctx.rotate(rotationRad);
+
+    let x = -totalWidth / 2;
+    const y = -opts.boxHeight / 2;
+    stats.forEach((line) => {
       const separatorIndex = line.indexOf(": ");
       const label = separatorIndex === -1 ? line : line.slice(0, separatorIndex);
       const value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 2);
 
-      const slot = opts.layout[i % opts.layout.length];
-      const x = opts.origin ? opts.origin.x + slot.dx : opts.startX;
-      const y = opts.origin ? opts.origin.y + slot.dy : opts.startY + i * opts.lineHeight;
-      const rotationRad = opts.origin ? (slot.rotationDeg * Math.PI) / 180 : 0;
+      ctx.strokeStyle = COLORS.boxBorder;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x, y, opts.boxWidth, opts.boxHeight);
 
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rotationRad);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-
-      ctx.shadowColor = COLORS.text;
-      ctx.shadowBlur = 1.5;
-
+      ctx.textAlign = "center";
       ctx.fillStyle = COLORS.textDim;
-      ctx.font = "700 13px ui-sans-serif, sans-serif";
+      ctx.font = "700 12px ui-sans-serif, sans-serif";
+      ctx.textBaseline = "top";
       ctx.letterSpacing = "1.5px";
-      ctx.fillText(label.toUpperCase(), 0, 0);
+      ctx.fillText(label.toUpperCase(), x + opts.boxWidth / 2, y + 14);
       ctx.letterSpacing = "0px";
 
       ctx.fillStyle = COLORS.text;
-      ctx.font = "800 34px ui-sans-serif, sans-serif";
-      ctx.fillText(value, 0, 34);
+      ctx.font = "800 28px ui-sans-serif, sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText(value, x + opts.boxWidth / 2, y + opts.boxHeight / 2 + 14);
 
-      ctx.restore();
+      x += opts.boxWidth + opts.gap;
     });
+    ctx.restore();
   }
 
   return {

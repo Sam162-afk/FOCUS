@@ -163,44 +163,46 @@ test("drawStatsOverlay writes a label and a value fillText call per stat line", 
   assert.ok(texts.includes("1.48"));
 });
 
-test("drawStatsOverlay draws plain glowing text with no bordered boxes", () => {
-  // Regression test: the reference display projects numbers directly onto
-  // the turf (plain text, no boxes) - matches a real commercial floor
-  // projection setup, not a corner-pinned HUD list.
-  const ctx = makeMockCtx();
-  FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Smash Factor: 1.48", "Carry: 220 yds"]);
-  assert.equal(ctx.calls.filter((c) => c[0] === "strokeRect").length, 0);
-});
-
-test("drawStatsOverlay rotates and scatters each stat around a given origin, not a uniform stack", () => {
+test("drawStatsOverlay draws one bordered box per stat, in a row, rotated once as a rigid unit", () => {
   const ctx = makeMockCtx();
   const origin = { x: 500, y: 400 };
   FocusRender.drawStatsOverlay(ctx, 800, ["Club Path: 2.1", "Carry: 220 yds", "Ball Speed: 148 mph"], { origin });
 
-  const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate");
-  assert.equal(rotateCalls.length, 3);
-  // Not all the same angle / not zero - each stat sits at its own slot.
-  const angles = rotateCalls.map((c) => c[1]);
-  assert.ok(new Set(angles).size > 1, "expected varying rotation angles across stats");
+  const boxCalls = ctx.calls.filter((c) => c[0] === "strokeRect");
+  assert.equal(boxCalls.length, 3, "expected one box per stat");
 
+  // Boxes sit side by side in a row (increasing local x), not stacked.
+  const xs = boxCalls.map((c) => c[1]);
+  assert.ok(xs[1] > xs[0] && xs[2] > xs[1], "expected boxes arranged left-to-right in a row");
+  const ys = boxCalls.map((c) => c[2]);
+  assert.equal(ys[0], ys[1]);
+  assert.equal(ys[1], ys[2]);
+
+  // Rotated once, as a whole row - not per-box - so it reads upright for
+  // the golfer standing at address rather than a bird's-eye viewer.
+  const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate");
+  assert.equal(rotateCalls.length, 1);
+  assert.notEqual(rotateCalls[0][1], 0);
+
+  // Anchored near the ball origin (one translate to origin+offset).
   const translateCalls = ctx.calls.filter((c) => c[0] === "translate");
-  assert.equal(translateCalls.length, 3);
-  translateCalls.forEach(([, x, y]) => {
-    // Each stat lands reasonably close to the ball origin, not stacked far
-    // away in a column.
-    assert.ok(Math.hypot(x - origin.x, y - origin.y) < 400, `expected stat near origin, got (${x}, ${y})`);
-  });
+  assert.equal(translateCalls.length, 1);
+  const [, tx, ty] = translateCalls[0];
+  assert.ok(Math.hypot(tx - origin.x, ty - origin.y) < 200, `expected the row anchored near the ball origin, got (${tx}, ${ty})`);
 });
 
-test("drawTargetLine draws a single vertical reference line from the impact point", () => {
+test("drawTargetLine draws a single vertical reference line straight through the ball, both directions", () => {
   const ctx = makeMockCtx();
   FocusRender.drawTargetLine(ctx, 800, 600);
   const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
   const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
   assert.ok(moveTo && lineTo);
-  // Straight up: same x for both ends, lineTo reaches the canvas top.
+  // Straight vertical line: same x for both ends, spanning the full canvas
+  // height (target direction at the top, behind the ball at the bottom) -
+  // not just a ray from the ball toward the target.
   assert.equal(moveTo[1], lineTo[1]);
-  assert.equal(lineTo[2], 0);
+  assert.equal(moveTo[2], 0);
+  assert.equal(lineTo[2], 600);
 });
 
 test("drawClubhead strokes a wireframe outline (no fill) at every frame", () => {

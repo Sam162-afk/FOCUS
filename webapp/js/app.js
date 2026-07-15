@@ -71,24 +71,21 @@
     // beside the golfer's actual tracked ball position, instead of a fixed
     // canvas point unrelated to where they're standing.
     let originPx = null;
-    const preShot = !currentShot;
 
     if (latestMatState && latestMatState.foot_mat_points_mm) {
       const [left, right] = latestMatState.foot_mat_points_mm;
       const feet = [{ x: left[0], y: left[1] }, { x: right[0], y: right[1] }];
 
-      // The stance/alignment reference is only useful while addressing the
-      // ball - once a shot is struck, showing it (along with the target
-      // line and distance gridlines) just clutters the results, unlike a
-      // real projected display, which shows nothing but the ball's own
-      // numbers once the swing is done.
-      if (preShot) {
-        FocusRender.drawAlignmentLine(ctx, canvas.width, canvas.height, feet, matSize);
-        FocusRender.drawFootOutlines(ctx, canvas.width, canvas.height, feet, matSize);
-      }
+      // The stance line and target line stay on through the whole swing
+      // (setup through impact and follow-through), not just pre-shot -
+      // they're the golfer's aim reference, not just an address-position
+      // indicator that should disappear once they start swinging.
+      FocusRender.drawAlignmentLine(ctx, canvas.width, canvas.height, feet, matSize);
+      FocusRender.drawFootOutlines(ctx, canvas.width, canvas.height, feet, matSize);
 
       const ballMatPosition = FocusRender.computeBallMatPosition(feet);
       originPx = FocusRender.matPointToCanvas(ballMatPosition, canvas.width, canvas.height, matSize);
+      FocusRender.drawTargetLine(ctx, canvas.width, canvas.height, { originPx });
     }
 
     const shotOptions = originPx ? { originPx } : undefined;
