@@ -100,16 +100,14 @@
       } else {
         // Follow-through and ball flight happen concurrently, like a real
         // swing: the ball's already gone while the golfer keeps swinging.
-        // The clubhead graphic itself stops once the follow-through
-        // settles - a real club would have long since left the frame, and
-        // lingering the synthetic silhouette on screen just clutters the
-        // results the way the real reference display never does.
+        // The clubhead graphic holds at its final follow-through position
+        // once the swing settles, rather than disappearing - it stays
+        // visible alongside the stats/ball flight until the next shot,
+        // like the rest of the settled shot's readout.
         const postImpactElapsed = elapsed - APPROACH_DURATION_MS;
         const followThroughProgress = Math.min(1, postImpactElapsed / FOLLOW_THROUGH_DURATION_MS);
-        if (followThroughProgress < 1) {
-          const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
-          FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame, shotOptions);
-        }
+        const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
+        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame, shotOptions);
 
         const rawProgress = Math.min(1, postImpactElapsed / FLIGHT_DURATION_MS);
         const progress = FocusAnim.easeOutCubic(rawProgress);
