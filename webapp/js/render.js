@@ -94,17 +94,24 @@
    * reference distinct from both the tracked stance line (green, real) and
    * the shot trace (white, outcome). Passes straight through the ball in
    * both directions (toward the target, and back behind the ball toward
-   * the golfer), not just a ray pointing away from it.
+   * the golfer), not just a ray pointing away from it. Bounded to a fixed
+   * length rather than the full canvas - a real reference line doesn't
+   * extend to infinity, and stretching it that far visually exaggerates
+   * even a near-square stance's small natural angle into what looks like
+   * a bad diagonal miss.
    */
   function drawTargetLine(ctx, width, height, options) {
+    const opts = Object.assign({ extentPx: 380 }, options || {});
     const origin = shotPointToCanvas({ x: 0, y: 0 }, width, height, options);
+    const top = Math.max(0, origin.y - opts.extentPx);
+    const bottom = Math.min(height, origin.y + opts.extentPx);
     ctx.save();
     ctx.strokeStyle = COLORS.targetLine;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 7]);
     ctx.beginPath();
-    ctx.moveTo(origin.x, 0);
-    ctx.lineTo(origin.x, height);
+    ctx.moveTo(origin.x, top);
+    ctx.lineTo(origin.x, bottom);
     ctx.stroke();
     ctx.restore();
   }
@@ -229,16 +236,21 @@
   /**
    * Draw the real, camera-tracked stance/alignment line. `footMatPoints`
    * is a pair of {x, y} points in mat-space millimeters; `matSize` is
-   * {widthMm, heightMm}. Drawn as a full-width line through the two feet,
-   * extended to the canvas edges so it reads as an aim reference. Offset
-   * toward the ball side by `toeOffsetMm` (default ~130mm, roughly half a
-   * shoe length) so the line reads as running along the toes - the real
-   * alignment reference golfers use - rather than through the tracked
-   * center of each foot.
+   * {widthMm, heightMm}. Drawn as a line through the two feet, extended a
+   * bounded distance (not to the canvas edges) so it reads as an aim
+   * reference. Offset toward the ball side by `toeOffsetMm` (default
+   * ~130mm, roughly half a shoe length) so the line reads as running
+   * along the toes - the real alignment reference golfers use - rather
+   * than through the tracked center of each foot.
+   *
+   * The extend length is deliberately bounded rather than spanning the
+   * whole canvas: stretching a line that far visually exaggerates even a
+   * near-square stance's small natural angle (a couple degrees is normal
+   * tracking noise) into what reads as a bad diagonal miss.
    */
   function drawAlignmentLine(ctx, width, height, footMatPoints, matSize, options) {
     if (!footMatPoints) return;
-    const opts = Object.assign({ toeOffsetMm: 130, side: 1 }, options || {});
+    const opts = Object.assign({ toeOffsetMm: 130, side: 1, extentPx: 380 }, options || {});
     const [left, right] = offsetAcrossStance(footMatPoints, opts.toeOffsetMm, opts.side);
 
     const p1 = matPointToCanvas(left, width, height, matSize);
@@ -249,7 +261,7 @@
     const len = Math.hypot(dx, dy) || 1;
     const ux = dx / len;
     const uy = dy / len;
-    const extend = Math.max(width, height);
+    const extend = opts.extentPx;
 
     ctx.strokeStyle = COLORS.alignmentLine;
     ctx.lineWidth = 3;
