@@ -24,6 +24,7 @@
     gridLabel: "rgba(154, 157, 143, 0.65)",
     targetLine: "rgba(245, 242, 234, 0.32)", // neutral dashed reference, distinct from the tracked stance line
     faceLine: "rgba(255, 176, 32, 0.55)", // dashed amber - ties to the impact-derived data family
+    clubPathLine: "rgba(96, 165, 250, 0.6)", // dashed blue - distinct from the amber face line and neutral target line
     boxBorder: "rgba(245, 242, 234, 0.35)",
   };
 
@@ -112,6 +113,42 @@
     ctx.beginPath();
     ctx.moveTo(origin.x, top);
     ctx.lineTo(origin.x, bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * The actual line the clubhead was traveling on through impact (club
+   * path), extrapolated both back through the approach and forward past
+   * the ball - distinct from drawTargetLine's straight-at-the-target
+   * reference. Reuses clubheadState's own start/impact canvas points
+   * (already encode the path-driven lateral lean from clubhead.js) rather
+   * than a separate angle formula, so this always agrees exactly with how
+   * the clubhead itself is drawn approaching the ball. Extrapolated in
+   * canvas-pixel space (like drawTargetLine's extentPx) rather than in
+   * shot-space before mapping - shotPointToCanvas uses a different y-scale
+   * above vs. below the origin, so a shot-space chord through impact would
+   * bend at the ball instead of drawing as one straight line.
+   */
+  function drawClubPathLine(ctx, width, height, clubheadState, options) {
+    if (!clubheadState) return;
+    const opts = Object.assign({ extentPx: 380 }, options || {});
+    const startPx = shotPointToCanvas(clubheadState.start, width, height, options);
+    const impactPx = shotPointToCanvas(clubheadState.impact, width, height, options);
+    const dx = impactPx.x - startPx.x;
+    const dy = impactPx.y - startPx.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const p1 = { x: impactPx.x - ux * opts.extentPx, y: impactPx.y - uy * opts.extentPx };
+    const p2 = { x: impactPx.x + ux * opts.extentPx, y: impactPx.y + uy * opts.extentPx };
+    ctx.save();
+    ctx.strokeStyle = COLORS.clubPathLine;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 7]);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
     ctx.restore();
   }
@@ -548,6 +585,7 @@
     computeBallMatPosition,
     drawDistanceGuides,
     drawTargetLine,
+    drawClubPathLine,
     drawShotPath,
     drawAlignmentLine,
     drawFootOutlines,

@@ -205,6 +205,50 @@ test("drawTargetLine draws a single vertical reference line straight through the
   assert.equal(lineTo[2], 600);
 });
 
+test("drawClubPathLine does nothing without a clubheadState", () => {
+  const ctx = makeMockCtx();
+  FocusRender.drawClubPathLine(ctx, 800, 600, null);
+  assert.ok(!ctx.calls.some((c) => c[0] === "stroke"));
+});
+
+test("drawClubPathLine draws a dashed line following the clubhead's actual approach direction, distinct from the straight-vertical target line", () => {
+  const shot = { ClubData: { Path: 8, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };
+  const state = FocusClubhead.computeClubheadState(shot);
+  const ctx = makeMockCtx();
+  FocusRender.drawClubPathLine(ctx, 800, 600, state);
+
+  assert.ok(ctx.calls.some((c) => c[0] === "setLineDash"), "expected a dashed reference line");
+  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
+  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
+  assert.ok(moveTo && lineTo);
+  // A nonzero club path leans the clubhead's approach off-vertical, so the
+  // line's two endpoints should NOT share the same x (unlike drawTargetLine,
+  // which is always a straight vertical line regardless of the shot).
+  assert.notEqual(moveTo[1], lineTo[1]);
+});
+
+test("drawClubPathLine's direction matches (impact - start) from the clubhead state, once mapped through the same shot-to-canvas transform", () => {
+  const shot = { ClubData: { Path: 8, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };
+  const state = FocusClubhead.computeClubheadState(shot);
+  const ctx = makeMockCtx();
+  FocusRender.drawClubPathLine(ctx, 800, 600, state);
+
+  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
+  const lineTo = ctx.calls.find((c) => c[0] === "lineTo");
+  const lineDx = lineTo[1] - moveTo[1];
+  const lineDy = lineTo[2] - moveTo[2];
+
+  // Map start/impact through the same shot-space -> canvas-pixel transform
+  // drawClubPathLine itself uses (non-uniform x/y scale), rather than
+  // comparing raw shot-space deltas against canvas-pixel deltas directly.
+  const startPx = FocusRender.shotPointToCanvas(state.start, 800, 600);
+  const impactPx = FocusRender.shotPointToCanvas(state.impact, 800, 600);
+  const stateDx = impactPx.x - startPx.x;
+  const stateDy = impactPx.y - startPx.y;
+  const cross = lineDx * stateDy - lineDy * stateDx;
+  assert.ok(Math.abs(cross) < 1e-6, `expected line parallel to (impact - start) in canvas space, cross=${cross}`);
+});
+
 test("drawClubhead strokes a wireframe outline (no fill) at every frame", () => {
   const ctx = makeMockCtx();
   const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };

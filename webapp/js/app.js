@@ -122,6 +122,7 @@
       // the numbers are already known before the animation even starts,
       // so show them from the first frame instead of waiting for the
       // swing/flight animation to finish playing out.
+      FocusRender.drawClubPathLine(ctx, canvas.width, canvas.height, currentClubheadState, shotOptions);
       FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, originPx, currentShot.BallData && currentShot.BallData.SpinAxis);
       FocusRender.drawStatsOverlay(
         ctx,
