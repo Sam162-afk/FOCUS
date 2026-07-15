@@ -196,13 +196,14 @@
   /**
    * A golfer doesn't stand over the ball - at address the ball sits out in
    * front of their toes, roughly a club-length away, not between/under the
-   * feet. Real-world address-position measurements (~22-26in for a mid-iron,
-   * ~24in avg, up to ~32-36in for a driver) are measured from the TOE LINE,
-   * not the raw tracked center of each foot - so the ball's total offset
-   * from the tracked foot points is `toeOffsetMm + addressDistanceMm`
-   * (~130mm + ~600mm = ~730mm by default), not just addressDistanceMm on
-   * its own, which would undershoot by however far the toe line already
-   * sits from the tracked center.
+   * feet. Real-world address-position measurements (~22-26in for a mid-iron
+   * up to ~32-36in for a driver) are measured from the TOE LINE, not the
+   * raw tracked center of each foot - so the ball's total offset from the
+   * tracked foot points is `toeOffsetMm + addressDistanceMm`, not just
+   * addressDistanceMm on its own, which would undershoot by however far
+   * the toe line already sits from the tracked center. Defaults toward
+   * the driver end of that range (~900mm/~35in) since we don't track
+   * which club is in play.
    *
    * `footMatPoints` is the tracked [left, right] pair in mat-space mm.
    * Returns the estimated ball position in the same mat-space, offset
@@ -214,7 +215,7 @@
    * at calibration time, not something derivable from two foot points alone.
    */
   function computeBallMatPosition(footMatPoints, options) {
-    const opts = Object.assign({ toeOffsetMm: 130, addressDistanceMm: 600, forwardOffsetMm: 0, side: 1 }, options || {});
+    const opts = Object.assign({ toeOffsetMm: 130, addressDistanceMm: 900, forwardOffsetMm: 0, side: 1 }, options || {});
     const [left, right] = footMatPoints;
     const dx = right.x - left.x;
     const dy = right.y - left.y;
