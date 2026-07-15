@@ -116,14 +116,19 @@
         const carry = currentShot.BallData && currentShot.BallData.CarryDistance;
         const landingLabel = typeof carry === "number" ? `${Math.round(carry)} YDS` : null;
         FocusRender.drawShotPath(ctx, canvas.width, canvas.height, currentPath, progress, Object.assign({}, shotOptions, { landingLabel }));
-        FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, originPx, currentShot.BallData && currentShot.BallData.SpinAxis);
-        FocusRender.drawStatsOverlay(
-          ctx,
-          canvas.width,
-          FocusStats.buildStatLines(currentShot, statIds),
-          originPx ? { origin: originPx } : undefined
-        );
       }
+
+      // The launch monitor sends the full shot data instantly at impact -
+      // the numbers are already known before the animation even starts,
+      // so show them from the first frame instead of waiting for the
+      // swing/flight animation to finish playing out.
+      FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, originPx, currentShot.BallData && currentShot.BallData.SpinAxis);
+      FocusRender.drawStatsOverlay(
+        ctx,
+        canvas.width,
+        FocusStats.buildStatLines(currentShot, statIds),
+        originPx ? { origin: originPx } : undefined
+      );
     }
 
     requestAnimationFrame(renderFrame);
