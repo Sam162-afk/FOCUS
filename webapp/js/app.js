@@ -6,9 +6,9 @@
 (function () {
   "use strict";
 
-  const APPROACH_DURATION_MS = 650; // clubhead swinging in and closing the face
-  const FOLLOW_THROUGH_DURATION_MS = 400; // clubhead continuing through, concurrent with ball flight
-  const FLIGHT_DURATION_MS = 900; // ball-flight trace
+  const APPROACH_DURATION_MS = 1950; // clubhead swinging in and closing the face (3x slowed)
+  const FOLLOW_THROUGH_DURATION_MS = 1200; // clubhead continuing through, concurrent with ball flight (3x slowed)
+  const FLIGHT_DURATION_MS = 2700; // ball-flight trace (3x slowed)
 
   const canvas = document.getElementById("field");
   const ctx = canvas.getContext("2d");
