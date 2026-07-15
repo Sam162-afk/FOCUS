@@ -175,7 +175,23 @@ test("face angle continues rotating in the same direction through the follow-thr
 test("follow-through continued closing is a modest, clamped amount even at tour-level closure rates", () => {
   const state = FocusClubhead.computeClubheadState(shotWith({ FaceToTarget: 0, ClosureRate: 2000 }));
   const sweep = state.faceToTarget - state.followThroughFaceAngleDeg;
-  assert.ok(sweep > 0 && sweep <= 10, `expected a modest, clamped follow-through sweep, got ${sweep} degrees`);
+  assert.ok(sweep > 0 && sweep <= 25, `expected a modest, clamped follow-through sweep, got ${sweep} degrees`);
+});
+
+test("rotation rate carries through impact instead of abruptly slowing down - the follow-through's initial rate matches the approach's rate right at impact", () => {
+  // Both easing curves are cubic, so each phase's progress-derivative at
+  // the impact instant is 3x its total sweep. Matching real-time rate
+  // across the two phases (which run for different real durations) means
+  // approachSweep/APPROACH_MS should equal followThroughSweep/FOLLOW_THROUGH_MS.
+  const APPROACH_MS = 1950;
+  const FOLLOW_THROUGH_MS = 1200;
+  const state = FocusClubhead.computeClubheadState(shotWith({ FaceToTarget: 0, ClosureRate: 2000 }));
+  const approachSweep = state.startFaceAngleDeg - state.faceToTarget;
+  const followThroughSweep = state.faceToTarget - state.followThroughFaceAngleDeg;
+  const approachRate = approachSweep / APPROACH_MS;
+  const followThroughRate = followThroughSweep / FOLLOW_THROUGH_MS;
+  const relError = Math.abs(approachRate - followThroughRate) / approachRate;
+  assert.ok(relError < 0.02, `expected matching rotation rates across impact, approach=${approachRate}, followThrough=${followThroughRate}`);
 });
 
 test("zero closure rate means the face angle holds steady through follow-through too", () => {

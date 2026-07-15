@@ -48,8 +48,18 @@
     // rotations.
     closureWindowSec: 0.01,
     maxApproachFaceSweepDeg: 35,
-    followThroughClosureWindowSec: 0.0025,
-    maxFollowThroughFaceSweepDeg: 10,
+    // The face shouldn't visibly lurch to a slower spin the instant the
+    // ball is struck - it should keep rotating at roughly the same rate
+    // it was closing at just before impact, then taper off. Both easing
+    // curves are cubic (easeInCubic/easeOutCubic below), so their
+    // progress-derivative at the impact instant is identically 3x the
+    // total sweep divided by that phase's duration; matching the rate on
+    // both sides of impact reduces to scaling the follow-through sweep by
+    // the ratio of the two phases' real animation durations
+    // (FOLLOW_THROUGH_DURATION_MS / APPROACH_DURATION_MS = 1200/1950 in
+    // both app.js and the artifact - keep these in sync if those change).
+    followThroughClosureWindowSec: 0.01 * (1200 / 1950),
+    maxFollowThroughFaceSweepDeg: 35 * (1200 / 1950),
   };
 
   function clamp(v, lo, hi) {
