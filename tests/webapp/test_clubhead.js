@@ -53,20 +53,20 @@ test("higher closure rate produces a more open starting face angle", () => {
   assert.ok(Math.abs(fast.startFaceAngleDeg) > Math.abs(slow.startFaceAngleDeg));
 });
 
-test("a realistic tour-level closure rate (~2000 deg/sec) sweeps a realistic total angle, not thousands of degrees", () => {
-  // Real PGA Tour closure rates run roughly 1,500-3,500 deg/sec; naively
-  // multiplying that by a multi-hundred-millisecond animation duration
-  // would extrapolate an absurd (1000+ degree) starting face angle. The
-  // sweep should land in the realistic ~70-120 degree range instead.
+test("a realistic tour-level closure rate (~2000 deg/sec) sweeps a modest angle scaled to the short approach arc actually drawn, not a 70-100 degree flip", () => {
+  // The 70-100 deg/0.04s research figure covers ~5-6ft of real clubhead
+  // travel at swing speed - much farther than the couple of feet our
+  // stylized approach arc depicts - so the swept angle here is scaled
+  // down to match the shorter visual distance instead of applied as-is.
   const state = FocusClubhead.computeClubheadState(shotWith({ FaceToTarget: 0, ClosureRate: 2000 }));
   const sweep = state.startFaceAngleDeg - state.faceToTarget;
-  assert.ok(sweep > 40 && sweep <= 120, `expected a realistic approach sweep, got ${sweep} degrees`);
+  assert.ok(sweep > 5 && sweep <= 35, `expected a modest approach sweep, got ${sweep} degrees`);
 });
 
 test("an extreme/noisy closure rate is clamped rather than spinning the clubhead through multiple rotations", () => {
   const state = FocusClubhead.computeClubheadState(shotWith({ FaceToTarget: 0, ClosureRate: 50000 }));
   const sweep = state.startFaceAngleDeg - state.faceToTarget;
-  assert.ok(sweep <= 120, `expected the approach sweep to be clamped, got ${sweep} degrees`);
+  assert.ok(sweep <= 35, `expected the approach sweep to be clamped, got ${sweep} degrees`);
 });
 
 test("face rotation eases in (starts slow, whips shut right before impact) rather than rotating at a constant rate", () => {
@@ -175,7 +175,7 @@ test("face angle continues rotating in the same direction through the follow-thr
 test("follow-through continued closing is a modest, clamped amount even at tour-level closure rates", () => {
   const state = FocusClubhead.computeClubheadState(shotWith({ FaceToTarget: 0, ClosureRate: 2000 }));
   const sweep = state.faceToTarget - state.followThroughFaceAngleDeg;
-  assert.ok(sweep > 0 && sweep <= 35, `expected a modest, clamped follow-through sweep, got ${sweep} degrees`);
+  assert.ok(sweep > 0 && sweep <= 10, `expected a modest, clamped follow-through sweep, got ${sweep} degrees`);
 });
 
 test("zero closure rate means the face angle holds steady through follow-through too", () => {

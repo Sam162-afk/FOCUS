@@ -33,15 +33,23 @@
     // PGA Tour closure rates run roughly 1,500-3,500 deg/sec, with ~70-100
     // degrees of the total closing happening in just the last ~0.04s of
     // the downswing (golf.com "What is rate of closure?"; GolfWRX "What it
-    // really takes to square the clubface at impact"). These convert the
-    // launch monitor's ClosureRate (deg/sec) into a total rotation SWEPT
-    // during the stylized approach/follow-through - not real elapsed-time
-    // durations - clamped so noisy or unusually high closure-rate data
-    // can't spin the graphic through multiple full rotations.
-    closureWindowSec: 0.045,
-    maxApproachFaceSweepDeg: 120,
-    followThroughClosureWindowSec: 0.01,
-    maxFollowThroughFaceSweepDeg: 35,
+    // really takes to square the clubface at impact"). But that ~0.04s
+    // window covers roughly 5-6 feet of real clubhead travel at swing
+    // speed, not the couple of feet our stylized approach arc actually
+    // depicts - applying the full 70-100 degrees to that much shorter
+    // visual distance looked like the club was flipping shut, not
+    // swinging. closureWindowSec is scaled down to roughly the last 2 feet
+    // (and pulled back further still on top of that) to match how short
+    // the depicted approach distance actually reads on screen. These
+    // convert the launch monitor's ClosureRate (deg/sec) into a total
+    // rotation SWEPT during the stylized approach/follow-through - not
+    // real elapsed-time durations - clamped so noisy or unusually high
+    // closure-rate data can't spin the graphic through multiple full
+    // rotations.
+    closureWindowSec: 0.01,
+    maxApproachFaceSweepDeg: 35,
+    followThroughClosureWindowSec: 0.0025,
+    maxFollowThroughFaceSweepDeg: 10,
   };
 
   function clamp(v, lo, hi) {
