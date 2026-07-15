@@ -23,40 +23,32 @@ test("negative HLA sends the ball left from the start", () => {
   assert.ok(path[1].x < 0, "expected early path points to move left of target line");
 });
 
-test("spin-axis curvature compounds with distance (draw/fade shape)", () => {
-  const shot = { BallData: { HLA: 0, SpinAxis: 20, CarryDistance: 250 } };
-  const path = FocusAnim.sampleShotPath(shot, {}, 100);
-  const at = (frac) => path[Math.round(frac * (path.length - 1))];
-
-  const early = Math.abs(at(0.3).x);
-  const late = Math.abs(at(0.9).x);
-  assert.ok(late > early, `expected curve to grow with distance, got early=${early} late=${late}`);
+test("spin axis has no effect on the drawn line - the whole line represents only the first few feet of flight, too short for curvature to show up", () => {
+  const straight = FocusAnim.sampleShotPath({ BallData: { HLA: 6, SpinAxis: 0, CarryDistance: 250 } }, {}, 40);
+  const curved = FocusAnim.sampleShotPath({ BallData: { HLA: 6, SpinAxis: 45, CarryDistance: 250 } }, {}, 40);
+  for (let i = 0; i < straight.length; i++) {
+    assert.ok(Math.abs(straight[i].x - curved[i].x) < 1e-9, `expected identical paths regardless of SpinAxis at point ${i}`);
+  }
 });
 
-test("spin-axis curvature is negligible right after impact even at max curve strength - the ball flies essentially straight before curving later", () => {
-  const shot = { BallData: { HLA: 0, SpinAxis: 45, CarryDistance: 250 } };
-  const path = FocusAnim.sampleShotPath(shot, {}, 1000);
-  const at = (frac) => path[Math.round(frac * (path.length - 1))];
-  // Within the first ~1% of the flight (a tiny fraction of a ~250yd
-  // shot - the literal first few feet), lateral drift should be a tiny
-  // fraction of the eventual max lateral offset (maxLateralFrac = 0.6),
-  // not a noticeable bend.
-  const veryEarly = Math.abs(at(0.01).x);
-  assert.ok(veryEarly < 0.001, `expected negligible curvature in the first ~1% of flight, got x=${veryEarly}`);
+test("the drawn line is straight (collinear points) for a nonzero HLA", () => {
+  const shot = { BallData: { HLA: 8, SpinAxis: 30, CarryDistance: 250 } };
+  const path = FocusAnim.sampleShotPath(shot, {}, 40);
+  const end = path[path.length - 1];
+  for (const pt of path) {
+    // Cross product of (pt - p0) and (end - p0) is ~0 for collinear points.
+    const cross = pt.x * end.y - pt.y * end.x;
+    assert.ok(Math.abs(cross) < 1e-9, `expected point (${pt.x}, ${pt.y}) collinear with the end point, cross=${cross}`);
+  }
 });
 
-test("carry distance beyond the display cap clamps endY to 1", () => {
-  const shot = { BallData: { HLA: 0, SpinAxis: 0, CarryDistance: 999 } };
-  const path = FocusAnim.sampleShotPath(shot, { maxCarryYds: 300 }, 10);
-  assert.equal(path[path.length - 1].y, 1);
-});
-
-test("longer (but under-cap) carry produces a proportionally longer path", () => {
-  const shortShot = { BallData: { HLA: 0, SpinAxis: 0, CarryDistance: 100 } };
-  const longShot = { BallData: { HLA: 0, SpinAxis: 0, CarryDistance: 250 } };
+test("carry distance does not change the drawn line's length - the mat can't show a real 200+ yard flight, only the first few feet", () => {
+  const shortShot = { BallData: { HLA: 5, SpinAxis: 0, CarryDistance: 80 } };
+  const longShot = { BallData: { HLA: 5, SpinAxis: 0, CarryDistance: 300 } };
   const shortPath = FocusAnim.sampleShotPath(shortShot, {}, 10);
   const longPath = FocusAnim.sampleShotPath(longShot, {}, 10);
-  assert.ok(longPath[longPath.length - 1].y > shortPath[shortPath.length - 1].y);
+  assert.equal(shortPath[shortPath.length - 1].y, longPath[longPath.length - 1].y);
+  assert.equal(shortPath[shortPath.length - 1].x, longPath[longPath.length - 1].x);
 });
 
 test("smashFactor divides ball speed by club speed", () => {
