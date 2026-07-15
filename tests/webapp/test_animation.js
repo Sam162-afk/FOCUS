@@ -33,6 +33,18 @@ test("spin-axis curvature compounds with distance (draw/fade shape)", () => {
   assert.ok(late > early, `expected curve to grow with distance, got early=${early} late=${late}`);
 });
 
+test("spin-axis curvature is negligible right after impact even at max curve strength - the ball flies essentially straight before curving later", () => {
+  const shot = { BallData: { HLA: 0, SpinAxis: 45, CarryDistance: 250 } };
+  const path = FocusAnim.sampleShotPath(shot, {}, 1000);
+  const at = (frac) => path[Math.round(frac * (path.length - 1))];
+  // Within the first ~1% of the flight (a tiny fraction of a ~250yd
+  // shot - the literal first few feet), lateral drift should be a tiny
+  // fraction of the eventual max lateral offset (maxLateralFrac = 0.6),
+  // not a noticeable bend.
+  const veryEarly = Math.abs(at(0.01).x);
+  assert.ok(veryEarly < 0.001, `expected negligible curvature in the first ~1% of flight, got x=${veryEarly}`);
+});
+
 test("carry distance beyond the display cap clamps endY to 1", () => {
   const shot = { BallData: { HLA: 0, SpinAxis: 0, CarryDistance: 999 } };
   const path = FocusAnim.sampleShotPath(shot, { maxCarryYds: 300 }, 10);

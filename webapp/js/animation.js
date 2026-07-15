@@ -23,7 +23,8 @@
     maxSpinAxisDeg: 45, // spin axis magnitude that maps to full curve strength
     maxLateralFrac: 0.6, // how far sideways (as a fraction of the x range) full curve strength bends the shot
     maxHlaDeg: 15, // HLA magnitude that maps to full initial-direction lateral offset
-    initialDirectionFrac: 0.35, // how far up the curve (0..1) the initial HLA direction control point sits
+    straightLaunchFrac: 0.3, // how far sideways (as a fraction of maxLateralFrac) the initial launch direction alone carries the ball by the end of the flight
+    curveGrowthPower: 3, // spin-driven curvature grows as t^curveGrowthPower rather than linearly with distance
   };
 
   function clamp(v, lo, hi) {
@@ -35,22 +36,28 @@
   }
 
   /**
-   * Quadratic Bezier evaluated at parameter t in [0, 1].
+   * Sample the shot's top-down shape at `steps + 1` evenly spaced points
+   * (t = 0..1 inclusive), for drawing or for progressive reveal animation.
+   * `shot` is expected to look like a GSPro-style BallData object:
+   * { HLA, VLA, SpinAxis, CarryDistance }.
+   *
+   * The lateral (x) offset is a straight component plus a curve component:
+   *  - straight: proportional to t (distance traveled) - where the ball
+   *    is actually heading right off the club, dominated by the face
+   *    angle via HLA (see computeHlaFromFacePath in the caller).
+   *  - curve: grows as t^curveGrowthPower rather than linearly, so
+   *    there's essentially no visible bend in the first few feet after
+   *    impact. Real sidespin-driven curvature compounds with hang
+   *    time/distance - it doesn't bend the ball immediately off the
+   *    clubface, and a real ball's flight looks close to straight until
+   *    well into its arc.
+   * At t=1 the total offset matches hlaFrac*maxLateralFrac*straightLaunchFrac
+   * + curveFrac*maxLateralFrac regardless of curveGrowthPower, so the
+   * final landing position (and CarryDistance labeling) is unaffected by
+   * this shaping - only how the ball visibly gets there changes.
    */
-  function quadraticBezier(p0, p1, p2, t) {
-    const mt = 1 - t;
-    return {
-      x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
-      y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y,
-    };
-  }
-
-  /**
-   * Compute the quadratic Bezier control points for a shot's top-down
-   * shape, given ball-flight numbers. `shot` is expected to look like a
-   * GSPro-style BallData object: { HLA, VLA, SpinAxis, CarryDistance }.
-   */
-  function computeShotControlPoints(shot, options) {
+  function sampleShotPath(shot, options, steps) {
+    steps = steps || 60;
     const opts = Object.assign({}, DEFAULTS, options || {});
     const ballData = shot.BallData || shot;
 
@@ -59,44 +66,15 @@
     const carry = ballData.CarryDistance || 0;
 
     const distanceFrac = clamp(carry / opts.maxCarryYds, 0, 1);
-    const endY = distanceFrac;
-
     const hlaFrac = clamp(hla / opts.maxHlaDeg, -1, 1);
     const curveFrac = clamp(spinAxis / opts.maxSpinAxisDeg, -1, 1);
 
-    const p0 = { x: 0, y: 0 };
-
-    // Control point: sits a short way up the curve, offset per the initial
-    // launch direction (HLA), so the tangent near impact reflects where
-    // the ball actually started heading.
-    const p1Y = endY * opts.initialDirectionFrac;
-    const p1 = {
-      x: hlaFrac * opts.maxLateralFrac * 0.5,
-      y: p1Y,
-    };
-
-    // End point: initial-direction contribution plus spin-driven curvature
-    // that compounds with distance (a draw/fade gets more pronounced the
-    // further the ball travels).
-    const p2 = {
-      x: hlaFrac * opts.maxLateralFrac * 0.3 + curveFrac * opts.maxLateralFrac,
-      y: endY,
-    };
-
-    return { p0, p1, p2 };
-  }
-
-  /**
-   * Sample the shot's shape curve at `steps + 1` evenly spaced points
-   * (t = 0..1 inclusive), for drawing or for progressive reveal animation.
-   */
-  function sampleShotPath(shot, options, steps) {
-    steps = steps || 60;
-    const { p0, p1, p2 } = computeShotControlPoints(shot, options);
     const points = [];
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
-      points.push(quadraticBezier(p0, p1, p2, t));
+      const straightX = hlaFrac * opts.maxLateralFrac * opts.straightLaunchFrac * t;
+      const curveX = curveFrac * opts.maxLateralFrac * Math.pow(t, opts.curveGrowthPower);
+      points.push({ x: straightX + curveX, y: distanceFrac * t });
     }
     return points;
   }
@@ -117,8 +95,6 @@
     DEFAULTS,
     clamp,
     degToRad,
-    quadraticBezier,
-    computeShotControlPoints,
     sampleShotPath,
     easeOutCubic,
     smashFactor,
