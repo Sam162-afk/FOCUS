@@ -21,17 +21,27 @@
   "use strict";
 
   const DEFAULTS = {
-    approachDurationSec: 0.65, // stylization only - how long the visual approach takes
     approachDistanceNorm: 0.32, // how far "behind" the ball the clubhead starts, in normalized units
     maxPathDeg: 15, // club path magnitude that maps to full lateral approach-line offset
     maxApproachLateralFrac: 0.35,
     maxHorizontalImpactIn: 0.75, // +/- inches from center that maps to the full face-line half-width
     maxVerticalImpactIn: 0.5,
     labelThreshold: 0.4, // |normalized impact| above which we call out a toe/heel/high/low strike
-    followThroughDurationSec: 0.4, // stylization only - how long the visual follow-through takes
     followThroughDistanceNorm: 0.24, // how far past impact the clubhead swings through, in normalized units
-    followThroughClosureFrac: 0.35, // fraction of the approach's closure that continues past impact
     impactMarkerHoldFrac: 0.3, // fraction of the follow-through the impact-point marker/label stays visible for
+    // Real clubface closure is fast and concentrated right before impact -
+    // PGA Tour closure rates run roughly 1,500-3,500 deg/sec, with ~70-100
+    // degrees of the total closing happening in just the last ~0.04s of
+    // the downswing (golf.com "What is rate of closure?"; GolfWRX "What it
+    // really takes to square the clubface at impact"). These convert the
+    // launch monitor's ClosureRate (deg/sec) into a total rotation SWEPT
+    // during the stylized approach/follow-through - not real elapsed-time
+    // durations - clamped so noisy or unusually high closure-rate data
+    // can't spin the graphic through multiple full rotations.
+    closureWindowSec: 0.045,
+    maxApproachFaceSweepDeg: 120,
+    followThroughClosureWindowSec: 0.01,
+    maxFollowThroughFaceSweepDeg: 35,
   };
 
   function clamp(v, lo, hi) {
@@ -44,6 +54,22 @@
 
   function lerpPoint(a, b, t) {
     return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
+  }
+
+  // The face doesn't close at a constant rate - real swings hold the face
+  // relatively open through most of the downswing and then whip it shut
+  // in the final instant before impact (see the closure-rate research
+  // cited on DEFAULTS above), then keep rotating briefly on residual
+  // momentum right after impact before tapering off. Easing the
+  // interpolation (rather than a plain lerp) reproduces that "snap
+  // shut, then settle" shape instead of a uniform spin.
+  function easeInCubic(t) {
+    return t * t * t;
+  }
+
+  function easeOutCubic(t) {
+    const mt = 1 - t;
+    return 1 - mt * mt * mt;
   }
 
   /**
@@ -69,10 +95,11 @@
       y: -opts.approachDistanceNorm,
     };
 
-    // The face was more open by (closureRate * approachDurationSec) one
-    // approach-phase-worth of time before impact, closing down to
-    // faceToTarget exactly at contact.
-    const startFaceAngleDeg = faceToTarget + closureRate * opts.approachDurationSec;
+    // The face was more open by this much before the final whip shut into
+    // impact - see the closure-window comment on DEFAULTS for where the
+    // conversion factor and clamp bound come from.
+    const approachSweepDeg = clamp(closureRate * opts.closureWindowSec, 0, opts.maxApproachFaceSweepDeg);
+    const startFaceAngleDeg = faceToTarget + approachSweepDeg;
 
     const horizontalImpactNorm = clamp(horizontalImpact / opts.maxHorizontalImpactIn, -1, 1);
     const verticalImpactNorm = clamp(verticalImpact / opts.maxVerticalImpactIn, -1, 1);
@@ -93,8 +120,8 @@
       x: -start.x * followThroughScale,
       y: opts.followThroughDistanceNorm,
     };
-    const followThroughFaceAngleDeg =
-      faceToTarget - closureRate * opts.followThroughDurationSec * opts.followThroughClosureFrac;
+    const followThroughSweepDeg = clamp(closureRate * opts.followThroughClosureWindowSec, 0, opts.maxFollowThroughFaceSweepDeg);
+    const followThroughFaceAngleDeg = faceToTarget - followThroughSweepDeg;
 
     return {
       start,
@@ -120,7 +147,7 @@
     const atImpact = t >= 1;
     return {
       position: lerpPoint(state.start, state.impact, t),
-      faceAngleDeg: lerp(state.startFaceAngleDeg, state.faceToTarget, t),
+      faceAngleDeg: lerp(state.startFaceAngleDeg, state.faceToTarget, easeInCubic(t)),
       atImpact,
       showImpactMarker: atImpact,
       inApproach: true,
@@ -138,7 +165,7 @@
     const t = clamp(progress, 0, 1);
     return {
       position: lerpPoint(state.impact, state.followThroughEnd, t),
-      faceAngleDeg: lerp(state.faceToTarget, state.followThroughFaceAngleDeg, t),
+      faceAngleDeg: lerp(state.faceToTarget, state.followThroughFaceAngleDeg, easeOutCubic(t)),
       atImpact: false,
       showImpactMarker: t < state.impactMarkerHoldFrac,
       inApproach: false,
