@@ -276,11 +276,17 @@
    * center point (not its individual rotation - see vision/foot_detector.py),
    * so each outline is drawn pointing perpendicular to the stance line,
    * approximating a square stance rather than reflecting real per-foot flare.
+   *
+   * Anchored at the same toe-offset point as drawAlignmentLine (not the
+   * raw tracked center), with the shoe shape drawn entirely behind that
+   * point (toe at the anchor, heel trailing back) - like a real alignment
+   * rod laid across the toes, with the foot behind it, rather than a
+   * rod floating detached from the foot shape.
    */
   function drawFootOutlines(ctx, width, height, footMatPoints, matSize, options) {
     if (!footMatPoints) return;
-    const opts = Object.assign({ footLengthPx: 46, footWidthPx: 22 }, options || {});
-    const [left, right] = footMatPoints;
+    const opts = Object.assign({ footLengthPx: 46, footWidthPx: 22, toeOffsetMm: 130, side: 1 }, options || {});
+    const [left, right] = offsetAcrossStance(footMatPoints, opts.toeOffsetMm, opts.side);
 
     const p1 = matPointToCanvas(left, width, height, matSize);
     const p2 = matPointToCanvas(right, width, height, matSize);
@@ -294,20 +300,20 @@
     const hw = opts.footWidthPx / 2;
     const hl = opts.footLengthPx / 2;
 
-    [p1, p2].forEach((center) => {
+    [p1, p2].forEach((toeAnchor) => {
       ctx.save();
-      ctx.translate(center.x, center.y);
+      ctx.translate(toeAnchor.x, toeAnchor.y);
       ctx.rotate(footAngle);
       ctx.strokeStyle = COLORS.alignmentLine;
       ctx.lineWidth = 2;
       ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(0, hl);
-      ctx.quadraticCurveTo(hw * 1.3, hl * 0.5, hw, 0);
-      ctx.quadraticCurveTo(hw * 0.9, -hl * 0.6, hw * 0.55, -hl);
-      ctx.quadraticCurveTo(0, -hl * 1.15, -hw * 0.55, -hl);
-      ctx.quadraticCurveTo(-hw * 0.9, -hl * 0.6, -hw, 0);
-      ctx.quadraticCurveTo(-hw * 1.3, hl * 0.5, 0, hl);
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(hw * 1.3, -hl * 0.5, hw, -hl);
+      ctx.quadraticCurveTo(hw * 0.9, -hl * 1.6, hw * 0.55, -hl * 2);
+      ctx.quadraticCurveTo(0, -hl * 2.15, -hw * 0.55, -hl * 2);
+      ctx.quadraticCurveTo(-hw * 0.9, -hl * 1.6, -hw, -hl);
+      ctx.quadraticCurveTo(-hw * 1.3, -hl * 0.5, 0, 0);
       ctx.closePath();
       ctx.stroke();
       ctx.restore();

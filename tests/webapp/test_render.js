@@ -304,6 +304,30 @@ test("drawFootOutlines does nothing when no feet are detected", () => {
   assert.equal(ctx.calls.length, 0);
 });
 
+test("drawFootOutlines anchors the toe (not the foot's center) at the same toe-offset point as the alignment line", () => {
+  // Regression test: the outline used to be centered on the raw tracked
+  // point while the alignment line was drawn at a toe-offset point -
+  // mismatched units (fixed pixels vs mat-space mm) left the line
+  // floating detached from the foot shape instead of touching its toe,
+  // unlike a real alignment rod laid across the toes.
+  const ctx = makeMockCtx();
+  const matSize = { widthMm: 1000, heightMm: 1500 };
+  const feet = [{ x: 500, y: 400 }, { x: 500, y: 1100 }]; // square stance, parallel to mat y-axis
+
+  FocusRender.drawFootOutlines(ctx, 800, 600, feet, matSize);
+
+  const translates = ctx.calls.filter((c) => c[0] === "translate");
+  const rawP1 = { x: (500 / 1000) * 800, y: 600 - (400 / 1500) * 600 };
+  // The toe-offset shift moves the anchor off the raw tracked point.
+  assert.notEqual(translates[0][1], rawP1.x);
+
+  // The path starts exactly at the anchor (the toe touches the line),
+  // not offset from it - moveTo(0, 0) in local space.
+  const moveTo = ctx.calls.find((c) => c[0] === "moveTo");
+  assert.equal(moveTo[1], 0);
+  assert.equal(moveTo[2], 0);
+});
+
 test("computeBallMatPosition offsets the ball away from the stance line, not on top of it", () => {
   // Regression test: the golfer doesn't stand with the ball between/under
   // their feet - real address positions put the ball out in front of the
