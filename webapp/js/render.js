@@ -446,7 +446,7 @@
       ctx.textBaseline = "alphabetic";
 
       ctx.shadowColor = COLORS.text;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = 1.5;
 
       ctx.fillStyle = COLORS.textDim;
       ctx.font = "700 13px ui-sans-serif, sans-serif";
