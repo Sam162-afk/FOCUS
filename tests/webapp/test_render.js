@@ -184,11 +184,14 @@ test("drawStatsOverlay draws one bordered box per stat, in a row, rotated once a
   assert.equal(rotateCalls.length, 1);
   assert.notEqual(rotateCalls[0][1], 0);
 
-  // Anchored near the ball origin (one translate to origin+offset).
+  // Anchored relative to the ball origin (one translate to origin+offset),
+  // offset well clear to the left so the clubhead's approach swing
+  // doesn't visually clip through the boxes.
   const translateCalls = ctx.calls.filter((c) => c[0] === "translate");
   assert.equal(translateCalls.length, 1);
   const [, tx, ty] = translateCalls[0];
-  assert.ok(Math.hypot(tx - origin.x, ty - origin.y) < 200, `expected the row anchored near the ball origin, got (${tx}, ${ty})`);
+  assert.ok(tx < origin.x, `expected the row offset to the left of the ball origin, got (${tx}, ${ty})`);
+  assert.ok(Math.hypot(tx - origin.x, ty - origin.y) < 400, `expected the row still reasonably close to the ball origin, got (${tx}, ${ty})`);
 });
 
 test("drawTargetLine draws a single vertical reference line straight through the ball, both directions", () => {
