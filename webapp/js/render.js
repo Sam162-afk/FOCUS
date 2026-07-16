@@ -364,7 +364,8 @@
    * animated position and face angle. `clubheadState` is from
    * clubhead.js's computeClubheadState(); `frame` is from
    * sampleClubheadFrame() for the current animation progress. At impact,
-   * draws the toe/heel/high/low contact-point marker on the face.
+   * draws the toe/heel contact-point marker on the face (horizontal only
+   * - this is a bird's-eye view, so vertical/high-low impact isn't shown).
    */
   function drawClubhead(ctx, width, height, clubheadState, frame, options) {
     const opts = Object.assign({ faceHalfWidthPx: 34 }, options || {});

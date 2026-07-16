@@ -1,10 +1,13 @@
 /**
  * Clubhead approach + impact visualization: a short stylized swing arc
  * ending at the ball, with the face closing into its impact angle and a
- * marker showing where on the face contact happened (toe/heel/high/low)
- * - the actual origin of "gear effect" curvature. Like animation.js's
- * ball-flight math, this is a stylized reconstruction tuned to look
- * right, not a swing-physics simulation.
+ * marker showing where on the face contact happened horizontally
+ * (toe/heel - the bird's-eye view can't show vertical/high-low impact).
+ * Like animation.js's ball-flight math, this is a stylized reconstruction
+ * tuned to look right, not a swing-physics simulation.
+ *
+ * verticalImpactNorm is still computed (in case a future view needs it)
+ * but nothing currently renders it.
  *
  * Shares animation.js's normalized coordinate system: x in [-1, 1]
  * (0 = target line), y in [0, 1] (0 = impact point). The clubhead
@@ -55,8 +58,11 @@
     // total sweep divided by that phase's duration; matching the rate on
     // both sides of impact reduces to scaling the follow-through sweep by
     // the ratio of the two phases' real animation durations
-    // (FOLLOW_THROUGH_DURATION_MS / APPROACH_DURATION_MS = 1200/1950 in
-    // both app.js and the artifact - keep these in sync if those change).
+    // (FOLLOW_THROUGH_DURATION_MS / APPROACH_DURATION_MS = 2400/3900 in
+    // both app.js and the artifact, currently - the 1200/1950 below is the
+    // same ratio from before both were doubled; recompute this fraction if
+    // the two durations are ever changed independently rather than by a
+    // shared multiplier).
     followThroughClosureWindowSec: 0.01 * (1200 / 1950),
     maxFollowThroughFaceSweepDeg: 35 * (1200 / 1950),
   };
