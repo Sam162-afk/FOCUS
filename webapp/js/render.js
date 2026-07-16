@@ -26,6 +26,7 @@
     faceLine: "rgba(255, 176, 32, 0.55)", // dashed amber - ties to the impact-derived data family
     clubPathLine: "rgba(96, 165, 250, 0.6)", // dashed blue - distinct from the amber face line and neutral target line
     boxBorder: "rgba(245, 242, 234, 0.35)",
+    impactMarker: "#ff3b5c", // bright red-pink - shotHead is the same color as the amber face-line it sits on top of, so the marker needs its own contrasting color to actually be visible
   };
 
   function clearCanvas(ctx, width, height) {
@@ -430,10 +431,13 @@
 
     if (frame.showImpactMarker) {
       const markerX = clubheadState.horizontalImpactNorm * fw;
-      ctx.fillStyle = COLORS.shotHead;
+      ctx.fillStyle = COLORS.impactMarker;
+      ctx.strokeStyle = COLORS.background;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(markerX, 0, 4, 0, Math.PI * 2);
+      ctx.arc(markerX, 0, 6, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
     }
 
     ctx.restore();

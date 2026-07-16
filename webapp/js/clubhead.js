@@ -24,7 +24,7 @@
     approachDistanceNorm: 0.32, // how far "behind" the ball the clubhead starts, in normalized units
     maxPathDeg: 15, // club path magnitude that maps to full lateral approach-line offset
     maxApproachLateralFrac: 0.35,
-    maxHorizontalImpactIn: 0.75, // +/- inches from center that maps to the full face-line half-width
+    maxHorizontalImpactIn: 1.25, // +/- inches from center that maps to the drawn face's toe/heel edge - roughly an iron face's half-width
     maxVerticalImpactIn: 0.5,
     followThroughDistanceNorm: 0.24, // how far past impact the clubhead swings through, in normalized units
     impactMarkerHoldFrac: 0.3, // fraction of the follow-through the impact-point marker stays visible for
