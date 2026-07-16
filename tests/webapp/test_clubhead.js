@@ -100,42 +100,20 @@ test("sampleClubheadFrame lerps position from start to impact", () => {
   assert.equal(mid.y, state.start.y / 2);
 });
 
-test("toe strike (positive horizontal impact) is labeled TOE STRIKE", () => {
+test("toe strike (positive horizontal impact) normalizes to a positive value", () => {
   const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6 }));
-  assert.equal(state.label, "TOE STRIKE");
   assert.ok(state.horizontalImpactNorm > 0);
 });
 
-test("heel strike (negative horizontal impact) is labeled HEEL STRIKE", () => {
+test("heel strike (negative horizontal impact) normalizes to a negative value", () => {
   const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: -0.6 }));
-  assert.equal(state.label, "HEEL STRIKE");
   assert.ok(state.horizontalImpactNorm < 0);
-});
-
-test("high face strike is labeled HIGH FACE when horizontal impact is centered", () => {
-  const state = FocusClubhead.computeClubheadState(shotWith({ VerticalFaceImpact: 0.4 }));
-  assert.equal(state.label, "HIGH FACE");
-});
-
-test("low face strike is labeled LOW FACE when horizontal impact is centered", () => {
-  const state = FocusClubhead.computeClubheadState(shotWith({ VerticalFaceImpact: -0.4 }));
-  assert.equal(state.label, "LOW FACE");
-});
-
-test("a flush, centered strike has no label", () => {
-  const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.05, VerticalFaceImpact: -0.05 }));
-  assert.equal(state.label, null);
 });
 
 test("horizontal and vertical impact norms clamp to [-1, 1] beyond the configured range", () => {
   const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 5, VerticalFaceImpact: -5 }));
   assert.equal(state.horizontalImpactNorm, 1);
   assert.equal(state.verticalImpactNorm, -1);
-});
-
-test("horizontal impact takes label priority over vertical when both are large", () => {
-  const state = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6, VerticalFaceImpact: 0.4 }));
-  assert.equal(state.label, "TOE STRIKE");
 });
 
 test("follow-through starts exactly at the impact point", () => {

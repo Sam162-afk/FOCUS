@@ -26,9 +26,8 @@
     maxApproachLateralFrac: 0.35,
     maxHorizontalImpactIn: 0.75, // +/- inches from center that maps to the full face-line half-width
     maxVerticalImpactIn: 0.5,
-    labelThreshold: 0.4, // |normalized impact| above which we call out a toe/heel/high/low strike
     followThroughDistanceNorm: 0.24, // how far past impact the clubhead swings through, in normalized units
-    impactMarkerHoldFrac: 0.3, // fraction of the follow-through the impact-point marker/label stays visible for
+    impactMarkerHoldFrac: 0.3, // fraction of the follow-through the impact-point marker stays visible for
     // Real clubface closure is fast and concentrated right before impact -
     // PGA Tour closure rates run roughly 1,500-3,500 deg/sec, with ~70-100
     // degrees of the total closing happening in just the last ~0.04s of
@@ -122,13 +121,6 @@
     const horizontalImpactNorm = clamp(horizontalImpact / opts.maxHorizontalImpactIn, -1, 1);
     const verticalImpactNorm = clamp(verticalImpact / opts.maxVerticalImpactIn, -1, 1);
 
-    let label = null;
-    if (Math.abs(horizontalImpactNorm) >= opts.labelThreshold) {
-      label = horizontalImpactNorm > 0 ? "TOE STRIKE" : "HEEL STRIKE";
-    } else if (Math.abs(verticalImpactNorm) >= opts.labelThreshold) {
-      label = verticalImpactNorm > 0 ? "HIGH FACE" : "LOW FACE";
-    }
-
     // Follow-through: the club doesn't stop at impact - it continues
     // through along roughly the same line of travel (start -> impact,
     // extrapolated past impact), and the face keeps rotating briefly in
@@ -152,7 +144,6 @@
       closureRate,
       horizontalImpactNorm,
       verticalImpactNorm,
-      label,
     };
   }
 

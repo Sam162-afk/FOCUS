@@ -281,7 +281,7 @@ test("drawClubhead draws a dashed face-line extension attached to the club, at e
   }
 });
 
-test("drawClubhead draws the impact marker only once atImpact is true", () => {
+test("drawClubhead draws the impact marker only once atImpact is true, with no text callout", () => {
   const ctx = makeMockCtx();
   const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0.6, VerticalFaceImpact: 0 } };
   const state = FocusClubhead.computeClubheadState(shot);
@@ -290,20 +290,7 @@ test("drawClubhead draws the impact marker only once atImpact is true", () => {
   FocusRender.drawClubhead(ctx, 800, 600, state, frame);
 
   assert.ok(ctx.calls.some((c) => c[0] === "arc"), "expected an impact marker dot to be drawn at impact");
-  const textCalls = ctx.calls.filter((c) => c[0] === "fillText");
-  assert.equal(textCalls.length, 1);
-  assert.equal(textCalls[0][1], "TOE STRIKE");
-});
-
-test("drawClubhead draws no label text for a flush, centered strike", () => {
-  const ctx = makeMockCtx();
-  const shot = { ClubData: { Path: 0, FaceToTarget: 0, ClosureRate: 0, HorizontalFaceImpact: 0, VerticalFaceImpact: 0 } };
-  const state = FocusClubhead.computeClubheadState(shot);
-  const frame = FocusClubhead.sampleClubheadFrame(state, 1);
-
-  FocusRender.drawClubhead(ctx, 800, 600, state, frame);
-
-  assert.equal(ctx.calls.filter((c) => c[0] === "fillText").length, 0);
+  assert.equal(ctx.calls.filter((c) => c[0] === "fillText").length, 0, "expected no TOE/HEEL/HIGH/LOW STRIKE text callout");
 });
 
 test("drawFootOutlines draws one stroked outline per foot", () => {

@@ -437,16 +437,6 @@
     }
 
     ctx.restore();
-
-    if (frame.showImpactMarker && clubheadState.label) {
-      ctx.fillStyle = COLORS.shotHead;
-      ctx.font = "700 15px ui-sans-serif, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.letterSpacing = "2px";
-      ctx.fillText(clubheadState.label, pos.x, pos.y - opts.faceHalfWidthPx - 6);
-      ctx.letterSpacing = "0px";
-    }
   }
 
   /**
