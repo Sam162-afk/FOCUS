@@ -9,7 +9,7 @@
   const APPROACH_DURATION_MS = 3900; // clubhead swinging in and closing the face (3x, then another 2x slowed)
   const FOLLOW_THROUGH_DURATION_MS = 2400; // clubhead continuing through, concurrent with ball flight (3x, then another 2x slowed)
   const FLIGHT_DURATION_MS = 5400; // ball-flight trace (3x, then another 2x slowed)
-  const DISPLAY_OFFSET_X = 260; // shifts the clubhead/ball-flight/stats cluster right of the true tracked ball position (which the target line still anchors to), so it has its own clear space
+  const STATS_OFFSET_X = 450; // shifts just the stat boxes well to the right of the true tracked ball position - the ball/clubhead/target line stay put
 
   const canvas = document.getElementById("field");
   const ctx = canvas.getContext("2d");
@@ -71,10 +71,10 @@
     // The target line, clubhead, and ball flight all stay anchored at the
     // real tracked ball position (originPx) - only the stat boxes are
     // deliberately decoupled from that point and drawn at a fixed
-    // rightward offset (displayOriginPx) instead, so the readout has
+    // rightward offset (statsOriginPx) instead, so the readout has
     // clear space of its own without moving the ball off the target line.
     let originPx = null;
-    let displayOriginPx = null;
+    let statsOriginPx = null;
 
     if (latestMatState && latestMatState.foot_mat_points_mm) {
       const [left, right] = latestMatState.foot_mat_points_mm;
@@ -89,7 +89,7 @@
 
       const ballMatPosition = FocusRender.computeBallMatPosition(feet);
       originPx = FocusRender.matPointToCanvas(ballMatPosition, canvas.width, canvas.height, matSize);
-      displayOriginPx = { x: originPx.x + DISPLAY_OFFSET_X, y: originPx.y };
+      statsOriginPx = { x: originPx.x + STATS_OFFSET_X, y: originPx.y };
       FocusRender.drawTargetLine(ctx, canvas.width, canvas.height, { originPx });
     }
 
@@ -131,7 +131,7 @@
         ctx,
         canvas.width,
         FocusStats.buildStatLines(currentShot, statIds),
-        displayOriginPx ? { origin: displayOriginPx } : undefined
+        statsOriginPx ? { origin: statsOriginPx } : undefined
       );
     }
 

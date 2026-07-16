@@ -507,7 +507,7 @@
         boxWidth: 150,
         boxHeight: 110,
         gap: 10,
-        offsetX: -200, // well clear (to the left) of the clubhead's approach sweep, so the swing doesn't visually clip through the boxes
+        offsetX: 0, // how far right of the ball the box row is anchored - the caller (app.js) controls the actual distance
         offsetY: -20,
         rotationDeg: 90,
       },
