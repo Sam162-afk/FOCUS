@@ -65,6 +65,17 @@
     // shared multiplier).
     followThroughClosureWindowSec: 0.01 * (1200 / 1950),
     maxFollowThroughFaceSweepDeg: 35 * (1200 / 1950),
+    // Gear effect on the clubhead itself: an off-center (toe/heel) strike
+    // makes the head twist about its CG at contact - the point far from
+    // center gets knocked back. maxGearDeflectionDeg is how far a full
+    // toe/heel strike visibly twists the head; the twist is proportional
+    // to how off-center the strike was (horizontalImpactNorm). It's held
+    // off until contact (gearRampStartFrac of the approach) since the
+    // twist comes from the strike, then persists through follow-through.
+    // Stylized for legibility - real gear twist is a few degrees, this is
+    // exaggerated so the mishit actually reads on a projected floor.
+    maxGearDeflectionDeg: 15,
+    gearRampStartFrac: 0.85,
   };
 
   function clamp(v, lo, hi) {
@@ -127,6 +138,12 @@
     const horizontalImpactNorm = clamp(horizontalImpact / opts.maxHorizontalImpactIn, -1, 1);
     const verticalImpactNorm = clamp(verticalImpact / opts.maxVerticalImpactIn, -1, 1);
 
+    // Gear twist: proportional to how far toward the toe/heel the strike
+    // was. Positive (toe) twists the head one way, negative (heel) the
+    // other. Applied to the face angle at/after impact (see the frame
+    // samplers), not here - this is just the magnitude.
+    const gearDeflectDeg = horizontalImpactNorm * opts.maxGearDeflectionDeg;
+
     // Follow-through: the club doesn't stop at impact - it continues
     // through along roughly the same line of travel (start -> impact,
     // extrapolated past impact), and the face keeps rotating briefly in
@@ -150,6 +167,8 @@
       closureRate,
       horizontalImpactNorm,
       verticalImpactNorm,
+      gearDeflectDeg,
+      gearRampStartFrac: opts.gearRampStartFrac,
     };
   }
 
@@ -160,9 +179,13 @@
   function sampleClubheadFrame(state, progress) {
     const t = clamp(progress, 0, 1);
     const atImpact = t >= 1;
+    // Gear twist only comes in over the final stretch of the approach (it's
+    // caused by the strike), ramping to full exactly at impact so it's
+    // continuous with the follow-through and visible when frozen at impact.
+    const gearRamp = clamp((t - state.gearRampStartFrac) / (1 - state.gearRampStartFrac), 0, 1);
     return {
       position: lerpPoint(state.start, state.impact, t),
-      faceAngleDeg: lerp(state.startFaceAngleDeg, state.faceToTarget, easeInCubic(t)),
+      faceAngleDeg: lerp(state.startFaceAngleDeg, state.faceToTarget, easeInCubic(t)) + state.gearDeflectDeg * gearRamp,
       atImpact,
       showImpactMarker: atImpact,
       inApproach: true,
@@ -180,7 +203,10 @@
     const t = clamp(progress, 0, 1);
     return {
       position: lerpPoint(state.impact, state.followThroughEnd, t),
-      faceAngleDeg: lerp(state.faceToTarget, state.followThroughFaceAngleDeg, easeOutCubic(t)),
+      // The gear twist reached full at impact and persists through the
+      // follow-through (the head stays twisted), on top of the continued
+      // closure - so it's added flat here rather than ramped.
+      faceAngleDeg: lerp(state.faceToTarget, state.followThroughFaceAngleDeg, easeOutCubic(t)) + state.gearDeflectDeg,
       atImpact: false,
       showImpactMarker: t < state.impactMarkerHoldFrac,
       inApproach: false,

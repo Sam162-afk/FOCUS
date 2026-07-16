@@ -116,6 +116,45 @@ test("horizontal and vertical impact norms clamp to [-1, 1] beyond the configure
   assert.equal(state.verticalImpactNorm, -1);
 });
 
+test("gear twist is zero for a centered strike and proportional (opposite signs) for toe vs heel", () => {
+  const center = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0 }));
+  const toe = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6 }));
+  const heel = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: -0.6 }));
+  const smallToe = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.3 }));
+  assert.equal(center.gearDeflectDeg, 0);
+  assert.ok(toe.gearDeflectDeg !== 0);
+  assert.equal(Math.sign(toe.gearDeflectDeg), -Math.sign(heel.gearDeflectDeg));
+  assert.ok(Math.abs(toe.gearDeflectDeg) > Math.abs(smallToe.gearDeflectDeg), "a worse strike twists the head more");
+});
+
+test("the gear twist shows up in the face angle at impact and persists through the follow-through", () => {
+  const centered = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0, FaceToTarget: 0, ClosureRate: 0 }));
+  const toe = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6, FaceToTarget: 0, ClosureRate: 0 }));
+
+  // At impact (approach t=1) the toe strike's face is twisted off the
+  // centered baseline by the full gear amount.
+  const centeredImpact = FocusClubhead.sampleClubheadFrame(centered, 1).faceAngleDeg;
+  const toeImpact = FocusClubhead.sampleClubheadFrame(toe, 1).faceAngleDeg;
+  assert.ok(Math.abs(toeImpact - centeredImpact - toe.gearDeflectDeg) < 1e-9);
+
+  // ...and the same twist is still there partway through the follow-through.
+  const toeFollow = FocusClubhead.sampleFollowThroughFrame(toe, 0.3).faceAngleDeg;
+  const centeredFollow = FocusClubhead.sampleFollowThroughFrame(centered, 0.3).faceAngleDeg;
+  assert.ok(Math.abs((toeFollow - centeredFollow) - toe.gearDeflectDeg) < 1e-9);
+});
+
+test("the gear twist only ramps in near impact, not during the early approach", () => {
+  const toe = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0.6, FaceToTarget: 0, ClosureRate: 0 }));
+  const centered = FocusClubhead.computeClubheadState(shotWith({ HorizontalFaceImpact: 0, FaceToTarget: 0, ClosureRate: 0 }));
+  // Halfway through the approach there's essentially no gear twist yet
+  // (the strike hasn't happened), so the toe and centered face angles match.
+  const early = FocusClubhead.sampleClubheadFrame(toe, 0.5).faceAngleDeg - FocusClubhead.sampleClubheadFrame(centered, 0.5).faceAngleDeg;
+  assert.ok(Math.abs(early) < 1e-9, `expected no gear twist mid-approach, got ${early}`);
+  // Right at impact it's the full amount.
+  const atImpact = FocusClubhead.sampleClubheadFrame(toe, 1).faceAngleDeg - FocusClubhead.sampleClubheadFrame(centered, 1).faceAngleDeg;
+  assert.ok(Math.abs(atImpact - toe.gearDeflectDeg) < 1e-9);
+});
+
 test("follow-through starts exactly at the impact point", () => {
   const state = FocusClubhead.computeClubheadState(shotWith({ Path: 8 }));
   const frame = FocusClubhead.sampleFollowThroughFrame(state, 0);

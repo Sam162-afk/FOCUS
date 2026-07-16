@@ -370,7 +370,20 @@
   function drawClubhead(ctx, width, height, clubheadState, frame, options) {
     const opts = Object.assign({ faceHalfWidthPx: 34 }, options || {});
     const fw = opts.faceHalfWidthPx;
-    const pos = shotPointToCanvas(frame.position, width, height, options);
+    // `contactPt` is where the strike point on the face lives - it's what
+    // traces the aim line into the ball and lands exactly on the ball at
+    // impact. `markerX` is how far along the face (toward toe/+ or heel/-)
+    // that strike point sits. The club CENTER is offset from the contact
+    // point by that much (along the rotated face tangent), so the club
+    // visibly strikes the ball with its toe/heel, its body sitting off to
+    // the side, rather than always hitting dead-center. Pinning the strike
+    // point to the ball also means the gear twist (baked into faceAngleDeg)
+    // rotates the head about the contact point, keeping contact on the ball.
+    const contactPt = shotPointToCanvas(frame.position, width, height, options);
+    const theta = (frame.faceAngleDeg * Math.PI) / 180;
+    const markerX = clubheadState.horizontalImpactNorm * fw;
+    const centerX = contactPt.x - markerX * Math.cos(theta);
+    const centerY = contactPt.y - markerX * Math.sin(theta);
 
     if (frame.inApproach && !frame.atImpact) {
       const startPos = shotPointToCanvas(clubheadState.start, width, height, options);
@@ -380,14 +393,14 @@
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(startPos.x, startPos.y);
-      ctx.lineTo(pos.x, pos.y);
+      ctx.lineTo(contactPt.x, contactPt.y);
       ctx.stroke();
       ctx.restore();
     }
 
     ctx.save();
-    ctx.translate(pos.x, pos.y);
-    ctx.rotate((frame.faceAngleDeg * Math.PI) / 180);
+    ctx.translate(centerX, centerY);
+    ctx.rotate(theta);
 
     // Asymmetric iron/wedge-head silhouette, viewed from above: a flat
     // face with a slight bulge, a rounded toe, a shorter squared heel,
@@ -431,7 +444,8 @@
     ctx.restore();
 
     if (frame.showImpactMarker) {
-      const markerX = clubheadState.horizontalImpactNorm * fw;
+      // Sits at the strike point on the face (local markerX), which the
+      // offset above places exactly on the ball - marks where contact was.
       ctx.fillStyle = COLORS.impactMarker;
       ctx.strokeStyle = COLORS.background;
       ctx.lineWidth = 1.5;

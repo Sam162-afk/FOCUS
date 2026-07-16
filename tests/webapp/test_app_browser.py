@@ -156,9 +156,11 @@ def test_clubhead_approach_and_impact_marker_render_on_real_canvas(server_url, b
             FocusRender.clearCanvas(ctx, canvas.width, canvas.height);
             const impactFrame = FocusClubhead.sampleClubheadFrame(state, 1);
             FocusRender.drawClubhead(ctx, canvas.width, canvas.height, state, impactFrame);
+            // The strike point (impact marker) is now pinned to the contact
+            // position - the club is offset so its toe/heel, not its center,
+            // lands there - so sample the contact point itself.
             const impactPos = FocusRender.shotPointToCanvas(impactFrame.position, canvas.width, canvas.height);
-            const markerX = impactPos.x + state.horizontalImpactNorm * 34;
-            const markerData = ctx.getImageData(Math.round(markerX), Math.round(impactPos.y), 1, 1).data;
+            const markerData = ctx.getImageData(Math.round(impactPos.x), Math.round(impactPos.y), 1, 1).data;
 
             return { midHit, marker: [markerData[0], markerData[1], markerData[2]] };
         }"""
