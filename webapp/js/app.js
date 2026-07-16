@@ -68,12 +68,11 @@
   function renderFrame(nowMs) {
     FocusRender.clearCanvas(ctx, canvas.width, canvas.height);
 
-    // The target line/foot outlines stay anchored at the real tracked ball
-    // position (originPx) - they're an accuracy reference and must not
-    // move. The clubhead/ball-flight/stats cluster is deliberately
-    // decoupled from that point and drawn at a fixed rightward offset
-    // (displayOriginPx) instead, so the animated readout has clear space
-    // of its own rather than crowding the real tracked position.
+    // The target line, clubhead, and ball flight all stay anchored at the
+    // real tracked ball position (originPx) - only the stat boxes are
+    // deliberately decoupled from that point and drawn at a fixed
+    // rightward offset (displayOriginPx) instead, so the readout has
+    // clear space of its own without moving the ball off the target line.
     let originPx = null;
     let displayOriginPx = null;
 
@@ -94,7 +93,7 @@
       FocusRender.drawTargetLine(ctx, canvas.width, canvas.height, { originPx });
     }
 
-    const shotOptions = displayOriginPx ? { originPx: displayOriginPx } : undefined;
+    const shotOptions = originPx ? { originPx } : undefined;
 
     if (currentShot && animationStartMs !== null) {
       const elapsed = nowMs - animationStartMs;
@@ -127,7 +126,7 @@
       // so show them from the first frame instead of waiting for the
       // swing/flight animation to finish playing out.
       FocusRender.drawClubPathLine(ctx, canvas.width, canvas.height, currentClubheadState, shotOptions);
-      FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, displayOriginPx, currentShot.BallData && currentShot.BallData.SpinAxis);
+      FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, originPx, currentShot.BallData && currentShot.BallData.SpinAxis);
       FocusRender.drawStatsOverlay(
         ctx,
         canvas.width,
