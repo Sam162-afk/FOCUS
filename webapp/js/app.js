@@ -6,9 +6,10 @@
 (function () {
   "use strict";
 
-  const APPROACH_DURATION_MS = 1950; // clubhead swinging in and closing the face (3x slowed)
-  const FOLLOW_THROUGH_DURATION_MS = 1200; // clubhead continuing through, concurrent with ball flight (3x slowed)
-  const FLIGHT_DURATION_MS = 2700; // ball-flight trace (3x slowed)
+  const APPROACH_DURATION_MS = 3900; // clubhead swinging in and closing the face (3x, then another 2x slowed)
+  const FOLLOW_THROUGH_DURATION_MS = 2400; // clubhead continuing through, concurrent with ball flight (3x, then another 2x slowed)
+  const FLIGHT_DURATION_MS = 5400; // ball-flight trace (3x, then another 2x slowed)
+  const DISPLAY_OFFSET_X = 260; // shifts the clubhead/ball-flight/stats cluster right of the true tracked ball position (which the target line still anchors to), so it has its own clear space
 
   const canvas = document.getElementById("field");
   const ctx = canvas.getContext("2d");
@@ -67,10 +68,14 @@
   function renderFrame(nowMs) {
     FocusRender.clearCanvas(ctx, canvas.width, canvas.height);
 
-    // Anchor the whole shot-space animation (clubhead, ball flight, stats)
-    // beside the golfer's actual tracked ball position, instead of a fixed
-    // canvas point unrelated to where they're standing.
+    // The target line/foot outlines stay anchored at the real tracked ball
+    // position (originPx) - they're an accuracy reference and must not
+    // move. The clubhead/ball-flight/stats cluster is deliberately
+    // decoupled from that point and drawn at a fixed rightward offset
+    // (displayOriginPx) instead, so the animated readout has clear space
+    // of its own rather than crowding the real tracked position.
     let originPx = null;
+    let displayOriginPx = null;
 
     if (latestMatState && latestMatState.foot_mat_points_mm) {
       const [left, right] = latestMatState.foot_mat_points_mm;
@@ -85,10 +90,11 @@
 
       const ballMatPosition = FocusRender.computeBallMatPosition(feet);
       originPx = FocusRender.matPointToCanvas(ballMatPosition, canvas.width, canvas.height, matSize);
+      displayOriginPx = { x: originPx.x + DISPLAY_OFFSET_X, y: originPx.y };
       FocusRender.drawTargetLine(ctx, canvas.width, canvas.height, { originPx });
     }
 
-    const shotOptions = originPx ? { originPx } : undefined;
+    const shotOptions = displayOriginPx ? { originPx: displayOriginPx } : undefined;
 
     if (currentShot && animationStartMs !== null) {
       const elapsed = nowMs - animationStartMs;
@@ -121,12 +127,12 @@
       // so show them from the first frame instead of waiting for the
       // swing/flight animation to finish playing out.
       FocusRender.drawClubPathLine(ctx, canvas.width, canvas.height, currentClubheadState, shotOptions);
-      FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, originPx, currentShot.BallData && currentShot.BallData.SpinAxis);
+      FocusRender.drawSpinDial(ctx, canvas.width, canvas.height, displayOriginPx, currentShot.BallData && currentShot.BallData.SpinAxis);
       FocusRender.drawStatsOverlay(
         ctx,
         canvas.width,
         FocusStats.buildStatLines(currentShot, statIds),
-        originPx ? { origin: originPx } : undefined
+        displayOriginPx ? { origin: displayOriginPx } : undefined
       );
     }
 
