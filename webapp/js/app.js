@@ -103,17 +103,17 @@
         const frame = FocusClubhead.sampleClubheadFrame(currentClubheadState, approachProgress);
         FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, frame, shotOptions);
       } else {
-        // Follow-through and ball flight happen concurrently, like a real
-        // swing: the ball's already gone while the golfer keeps swinging.
-        // The clubhead graphic holds at its final follow-through position
-        // once the swing settles, rather than disappearing - it stays
-        // visible alongside the stats/ball flight until the next shot,
-        // like the rest of the settled shot's readout.
-        const postImpactElapsed = elapsed - APPROACH_DURATION_MS;
-        const followThroughProgress = Math.min(1, postImpactElapsed / FOLLOW_THROUGH_DURATION_MS);
-        const clubheadFrame = FocusClubhead.sampleFollowThroughFrame(currentClubheadState, followThroughProgress);
-        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, clubheadFrame, shotOptions);
+        // The ball's gone, but the informative pose is the STRIKE, not the
+        // follow-through: hold the club at the ball in its impact pose -
+        // struck off-center at the real toe/heel contact point, twisted by
+        // gear effect, contact marker on - for the whole flight + settle,
+        // while the ball flight traces out. Following through downrange (as
+        // it used to) moved the club away from the ball and hid where/how
+        // the ball was actually struck.
+        const impactFrame = FocusClubhead.sampleClubheadFrame(currentClubheadState, 1);
+        FocusRender.drawClubhead(ctx, canvas.width, canvas.height, currentClubheadState, impactFrame, shotOptions);
 
+        const postImpactElapsed = elapsed - APPROACH_DURATION_MS;
         const rawProgress = Math.min(1, postImpactElapsed / FLIGHT_DURATION_MS);
         const progress = FocusAnim.easeOutCubic(rawProgress);
         const carry = currentShot.BallData && currentShot.BallData.CarryDistance;

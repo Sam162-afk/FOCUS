@@ -74,7 +74,7 @@
     // twist comes from the strike, then persists through follow-through.
     // Stylized for legibility - real gear twist is a few degrees, this is
     // exaggerated so the mishit actually reads on a projected floor.
-    maxGearDeflectionDeg: 15,
+    maxGearDeflectionDeg: 25,
     gearRampStartFrac: 0.85,
   };
 

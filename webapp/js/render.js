@@ -368,7 +368,7 @@
    * - this is a bird's-eye view, so vertical/high-low impact isn't shown).
    */
   function drawClubhead(ctx, width, height, clubheadState, frame, options) {
-    const opts = Object.assign({ faceHalfWidthPx: 34 }, options || {});
+    const opts = Object.assign({ faceHalfWidthPx: 44 }, options || {});
     const fw = opts.faceHalfWidthPx;
     // `contactPt` is where the strike point on the face lives - it's what
     // traces the aim line into the ball and lands exactly on the ball at
